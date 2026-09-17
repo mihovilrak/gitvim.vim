@@ -1,0 +1,232 @@
+*gitvim.txt*                A VS Code-shaped Git workbench for Neovim/LazyVim
+
+Author:   Mihovil Rak
+License:  MIT
+Version:  0.0.0-dev
+
+==============================================================================
+CONTENTS                                                     *gitvim-contents*
+
+    1. Introduction .......................... |gitvim-introduction|
+    2. Requirements .......................... |gitvim-requirements|
+    3. Setup ................................. |gitvim-setup|
+    4. Commands .............................. |gitvim-commands|
+    5. Configuration ......................... |gitvim-config|
+    6. Sidebar tabs .......................... |gitvim-tabs|
+    7. Review view ........................... |gitvim-review|
+    8. Buffer layer .......................... |gitvim-buffer|
+    9. Highlights ............................ |gitvim-highlights|
+   10. Health ................................ |gitvim-health|
+   11. Development ........................... |gitvim-development|
+
+NOTE: gitvim.nvim is pre-alpha. Sections marked (planned) describe behaviour
+that is designed and scheduled but not yet implemented. See Plan.md in the
+repository for the design decisions and the task checklist.
+
+==============================================================================
+1. INTRODUCTION                                          *gitvim-introduction*
+
+gitvim.nvim assembles Neovim's Git capabilities into one docked, discoverable
+surface modelled on VS Code's Source Control view, plus GitLens-style blame and
+a Git Graph-style commit graph.
+
+It is an orchestration layer. gitvim owns the sidebar, the graph, the timeline,
+the commit UI and the remote operations; it delegates the in-buffer layer
+(signs, hunks, blame) to gitsigns.nvim through a single bridge module, so the
+coupling stays thin and auditable.
+
+==============================================================================
+2. REQUIREMENTS                                          *gitvim-requirements*
+
+    Neovim 0.11 or newer
+    git 2.30 or newer
+    gitsigns.nvim                                   (required)
+    snacks.nvim                                     (optional, sidebar window)
+    mini.icons                                      (optional, filetype icons)
+
+Both optional dependencies have fallbacks. Run |:checkhealth| gitvim to see
+what was detected.
+
+==============================================================================
+3. SETUP                                                        *gitvim-setup*
+
+With lazy.nvim: >lua
+
+    {
+      "mihovilrak/gitvim.nvim",
+      dependencies = { "lewis6991/gitsigns.nvim" },
+      cmd = "GitVim",
+      keys = {
+        { "<leader>gg", "<cmd>GitVim toggle<cr>", desc = "GitVim sidebar" },
+      },
+      opts = {},
+    }
+<
+Calling `setup()` is optional if you are happy with the defaults; the |:GitVim|
+command initialises the plugin on first use.
+
+                                                            *gitvim.setup()*
+require("gitvim").setup({opts})
+    Merge {opts} over the defaults and initialise. Safe to call once; repeat
+    calls are ignored.
+
+                                                             *gitvim.open()*
+require("gitvim").open({tab})
+    Open the sidebar, optionally focusing {tab} ("scm", "graph", "timeline").
+
+                                                            *gitvim.close()*
+require("gitvim").close()
+
+                                                           *gitvim.toggle()*
+require("gitvim").toggle()
+
+==============================================================================
+4. COMMANDS                                                  *gitvim-commands*
+
+                                                                    *:GitVim*
+:GitVim open [{tab}]    Open the sidebar. {tab} is "scm", "graph" or
+                        "timeline"; defaults to `sidebar.default_tab`.
+:GitVim close           Close the sidebar.
+:GitVim toggle          Toggle the sidebar.
+
+Subcommands complete with <Tab>.
+
+==============================================================================
+5. CONFIGURATION                                               *gitvim-config*
+
+`lua/gitvim/config.lua` is the authoritative reference; every key below is
+deep-merged over the defaults.
+
+sidebar~
+    position        "left"|"right"      default "left"
+    width           number              default 40
+    stack           boolean             default false
+                    Share the side column with an existing split (such as
+                    your file explorer) instead of opening beside it.
+    tabs            string[]            default { "scm", "graph", "timeline" }
+    default_tab     string              default "scm"
+    close_on_open   boolean             default false
+
+scm~
+    groups          string[]  default { "merge", "staged", "changes",
+                              "untracked" }
+    collapsed       string[]  groups collapsed on first open
+    confirm_discard boolean   default true
+    row_actions     boolean   show [+] [-] [<] on the focused row
+
+graph~
+    page_size       number    default 256, more load on scroll
+    lane_colors     number    default 8, palette length before cycling
+    date_format     "relative"|"short"|"iso"
+    show_refs       boolean   render branch/tag badges
+
+timeline~
+    page_size       number    default 128
+    follow_renames  boolean   use `git log --follow`
+    follow_buffer   boolean   track the active buffer automatically
+
+review~
+    layout          "split"|"unified"
+    diffopt         string[]  appended to 'diffopt' in review windows
+    hunk_actions    boolean   right-aligned per-hunk buttons
+
+buffer~
+    signs            boolean  apply gitvim's sign theme to gitsigns
+    blame            boolean  current-line blame virtual text
+    blame_format     string   default
+                     "<author>, <author_time:%R> - <summary>"
+    clickable_gutter boolean  double-click a sign to expand the hunk inline;
+                     composes with an existing 'statuscolumn' rather than
+                     replacing it
+
+refresh~
+    debounce        number    milliseconds, default 50
+    watch_gitdir    boolean   watch .git for external git operations
+    events          string[]  default { "BufWritePost", "FocusGained" }
+
+icons~
+    enabled         boolean
+    status          table     letters per status: modified "M", added "A",
+                              deleted "D", renamed "R", copied "C",
+                              untracked "U", ignored "I", conflict "!"
+
+keymaps~
+    enabled         boolean   default true
+    prefix          string    default "<leader>g"
+
+==============================================================================
+6. SIDEBAR TABS                                                  *gitvim-tabs*
+
+SOURCE CONTROL                                                    *gitvim-scm*
+    (planned) Collapsible groups with counts: Merge changes, Staged, Changes,
+    Untracked. Each row carries a status letter, a filetype icon and VS Code
+    colouring. The header shows the branch and ahead/behind counters. Actions:
+    stage, unstage, discard, commit, fetch, pull, push.
+
+GRAPH                                                           *gitvim-graph*
+    (planned) `git log` rendered with per-branch coloured lanes. Selecting a
+    commit lists its changed files; selecting a file opens |gitvim-review| for
+    that commit against its parent.
+
+TIMELINE                                                     *gitvim-timeline*
+    (planned) History of one file via `git log --follow`, rendered through the
+    same lane engine as the graph.
+
+==============================================================================
+7. REVIEW VIEW                                                 *gitvim-review*
+
+(planned) A two-pane diff using Neovim's native diff mode, so filler lines,
+scrollbind, folding of unchanged regions and word-level highlighting all come
+from the editor itself. Each hunk carries right-aligned `[+]` `[<]` `[^]`
+buttons for stage, revert and expand.
+
+==============================================================================
+8. BUFFER LAYER                                                *gitvim-buffer*
+
+(planned) gitvim themes gitsigns' signs, shows current-line blame as virtual
+text, and installs an optional clickable gutter: double-clicking a sign
+expands that hunk inline, right-clicking opens a hunk action menu. Every mouse
+interaction also has a keymap under `keymaps.prefix`.
+
+==============================================================================
+9. HIGHLIGHTS                                              *gitvim-highlights*
+
+All groups are linked to existing semantic groups, never hardcoded colours, so
+they follow your colorscheme.
+
+    GitVimAdded             new file / added hunk
+    GitVimModified          modified file / changed hunk
+    GitVimDeleted           deleted file / removed hunk
+    GitVimUntracked         untracked file
+    GitVimRenamed           renamed file
+    GitVimConflict          unmerged file
+    GitVimGraphLane1..8     graph lane palette
+
+Override with |:highlight| after your colorscheme loads.
+
+==============================================================================
+10. HEALTH                                                     *gitvim-health*
+
+>vim
+    :checkhealth gitvim
+<
+Reports the Neovim and git versions, whether gitsigns, snacks and mini.icons
+were found, whether 'mouse' is enabled for click handling, and whether the
+current directory is inside a git repository.
+
+==============================================================================
+11. DEVELOPMENT                                           *gitvim-development*
+
+>bash
+    make test        # headless plenary suite
+    make test-file FILE=tests/gitvim/fixture_spec.lua
+    make fmt         # stylua
+    make lint        # luacheck
+    make docs        # regenerate doc/tags
+    make all         # fmt-check + lint + test
+<
+Dependencies are cloned into `.tests/` on the first run. Tests build a
+deterministic throwaway repository (branch, merge, rename, and a dirty
+worktree covering every status group) via `tests/fixture.lua`.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
