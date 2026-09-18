@@ -27,17 +27,17 @@ test-file:
 lint:
 	@command -v luacheck >/dev/null 2>&1 \
 		|| { echo "SKIPPED lint: luacheck not found (luarocks install luacheck)"; exit 0; }; \
-	luacheck lua tests
+	luacheck lua tests plugin
 
 fmt:
 	@command -v stylua >/dev/null 2>&1 \
 		|| { echo "SKIPPED fmt: stylua not found (cargo install stylua)"; exit 0; }; \
-	stylua lua tests
+	stylua lua tests plugin
 
 fmt-check:
 	@command -v stylua >/dev/null 2>&1 \
 		|| { echo "SKIPPED fmt-check: stylua not found (cargo install stylua)"; exit 0; }; \
-	stylua --check lua tests
+	stylua --check lua tests plugin
 
 # Regenerate helptags from doc/gitvim.txt
 docs:

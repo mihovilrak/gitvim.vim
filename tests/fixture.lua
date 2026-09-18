@@ -29,8 +29,6 @@
 
 local M = {}
 
-local uv = vim.uv or vim.loop
-
 ---@class gitvim.Fixture
 ---@field root string
 local Fixture = {}
