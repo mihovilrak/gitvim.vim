@@ -15,8 +15,8 @@ describe("commands.complete", function()
   end)
 
   it("completes a subcommand's own arguments", function()
-    assert.same({ "scm", "graph", "timeline" }, commands.complete("", "GitVim open "))
-    assert.same({ "scm" }, commands.complete("s", "GitVim open s"))
+    assert.same({ "files", "search", "git", "buffers" }, commands.complete("", "GitVim open "))
+    assert.same({ "search" }, commands.complete("se", "GitVim open se"))
   end)
 
   it("offers nothing after a subcommand that takes no arguments", function()

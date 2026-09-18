@@ -17,22 +17,25 @@ function M.setup(opts)
 
   require("gitvim.config").setup(opts)
   require("gitvim.commands").setup()
-  -- Phase 2 onwards: ui.hl.setup(), buffer.signs.setup(), refresh watcher.
+  require("gitvim.ui.hl").setup()
+  -- Phase 3 onwards: buffer.signs.setup(), the refresh watcher.
 end
 
 --- Open (and focus) the sidebar.
----@param tab? "scm"|"graph"|"timeline"
+---@param tab? gitvim.Tab
 function M.open(tab)
-  local _ = tab
-  vim.notify("gitvim: sidebar not implemented yet (Plan.md phase 2)", vim.log.levels.WARN)
+  require("gitvim.ui.sidebar").open(tab)
 end
 
 --- Close the sidebar.
-function M.close() end
+function M.close()
+  require("gitvim.ui.sidebar").close()
+end
 
 --- Toggle the sidebar.
-function M.toggle()
-  M.open()
+---@param tab? gitvim.Tab
+function M.toggle(tab)
+  require("gitvim.ui.sidebar").toggle(tab)
 end
 
 --- Detect the repository for `path` and re-read its status into the store.

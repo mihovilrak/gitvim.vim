@@ -17,11 +17,22 @@ local M = {}
 ---| "dirty"    # a slot was invalidated; payload { root, slot }
 ---| "error"    # a git call failed; payload { root, err }
 
+---@class gitvim.state.Search
+---@field pattern string
+---@field replace string
+---@field include string
+---@field exclude string
+---@field case boolean    match case
+---@field word boolean    whole word
+---@field regex boolean   treat the pattern as a regular expression
+
 ---@class gitvim.Store
 ---@field root string
 ---@field status? gitvim.status.Result
 ---@field collapsed table<string, boolean>  sidebar group collapse, per repo
+---@field expanded table<string, boolean>   Files tab: expanded directories, per repo
 ---@field draft string                      unsent commit message, per repo
+---@field search gitvim.state.Search        Search tab form contents, per repo
 ---@field dirty table<gitvim.state.Slot, boolean>
 local Store = {}
 Store.__index = Store
@@ -100,10 +111,21 @@ function M.get(root)
   root = vim.fs.normalize(root)
   local store = stores[root]
   if not store then
+    local search = require("gitvim.config").options.search
     store = setmetatable({
       root = root,
       collapsed = {},
+      expanded = {},
       draft = "",
+      search = {
+        pattern = "",
+        replace = "",
+        include = search.include,
+        exclude = search.exclude,
+        case = search.case_sensitive,
+        word = search.whole_word,
+        regex = search.regex,
+      },
       dirty = { status = true, head = true },
     }, Store)
     stores[root] = store

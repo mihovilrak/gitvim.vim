@@ -25,14 +25,14 @@ describe("config.setup", function()
     local o = config.setup()
     assert.equals("left", o.sidebar.position)
     assert.equals(40, o.sidebar.width)
-    assert.same({ "scm", "graph", "timeline" }, o.sidebar.tabs)
+    assert.same({ "files", "search", "git", "buffers" }, o.sidebar.tabs)
   end)
 
   it("deep merges without dropping sibling keys", function()
     local o = config.setup({ sidebar = { width = 60 } })
     assert.equals(60, o.sidebar.width)
     assert.equals("left", o.sidebar.position)
-    assert.equals("scm", o.sidebar.default_tab)
+    assert.equals("git", o.sidebar.default_tab)
   end)
 
   it("does not let one setup leak into the next", function()
@@ -41,8 +41,8 @@ describe("config.setup", function()
   end)
 
   it("replaces list options wholesale rather than appending", function()
-    local o = config.setup({ sidebar = { tabs = { "scm" }, default_tab = "scm" } })
-    assert.same({ "scm" }, o.sidebar.tabs)
+    local o = config.setup({ sidebar = { tabs = { "git" }, default_tab = "git" } })
+    assert.same({ "git" }, o.sidebar.tabs)
   end)
 
   it("reads a dotted path", function()
@@ -59,6 +59,14 @@ describe("config.setup", function()
     assert.same({}, messages)
     assert.equals("S", config.options.icons.status.submodule)
     assert.equals("M", config.options.icons.status.modified)
+  end)
+
+  it("accepts arbitrary icon overrides", function()
+    local messages = captured(function()
+      config.setup({ icons = { overrides = { git = "G" } } })
+    end)
+    assert.same({}, messages)
+    assert.equals("G", config.options.icons.overrides.git)
   end)
 
   it("warns about an unknown key instead of silently ignoring it", function()
@@ -80,13 +88,17 @@ describe("config.setup", function()
   for name, opts in pairs({
     ["sidebar.position"] = { sidebar = { position = "middle" } },
     ["sidebar.width"] = { sidebar = { width = "wide" } },
-    ["sidebar.tabs"] = { sidebar = { tabs = { "scm", "nope" } } },
+    ["sidebar.tabs"] = { sidebar = { tabs = { "git", "nope" } } },
     ["graph.page_size"] = { graph = { page_size = 0 } },
     ["graph.date_format"] = { graph = { date_format = "fuzzy" } },
     ["review.layout"] = { review = { layout = "side-by-side" } },
     ["refresh.debounce"] = { refresh = { debounce = -1 } },
     ["keymaps.prefix"] = { keymaps = { prefix = false } },
     ["scm.groups"] = { scm = { groups = { "nope" } } },
+    ["git.sections"] = { git = { sections = { "nope" } } },
+    ["files.root"] = { files = { root = "home" } },
+    ["buffers.sort"] = { buffers = { sort = "size" } },
+    ["icons.style"] = { icons = { style = "emoji" } },
   }) do
     it("rejects a bad " .. name, function()
       assert.has_error(function()
@@ -96,7 +108,7 @@ describe("config.setup", function()
   end
 
   it("rejects a default_tab that is not among the tabs", function()
-    local ok, err = pcall(config.setup, { sidebar = { tabs = { "scm" }, default_tab = "graph" } })
+    local ok, err = pcall(config.setup, { sidebar = { tabs = { "git" }, default_tab = "files" } })
     assert.is_false(ok)
     assert.is_truthy(tostring(err):match("default_tab"))
   end)

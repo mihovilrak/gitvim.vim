@@ -1,8 +1,8 @@
 # gitvim.nvim
 
-> **Status: pre-alpha, under active development.** The scaffolding, test harness and
-> plan are in place; the features below are being built. See [Plan.md](Plan.md) for
-> the full design and the task checklist.
+> **Status: pre-alpha, under active development.** The scaffolding, the test harness
+> and the sidebar shell are in place; the Git features below are being built. See
+> [Plan.md](Plan.md) for the full design and the task checklist.
 
 A VS Code-shaped Git workbench for Neovim, built for LazyVim.
 
@@ -13,28 +13,32 @@ sidebar, the graph, the timeline, the commit UI and the remote operations, and
 delegates the in-buffer layer to [gitsigns.nvim](https://github.com/lewis6991/gitsigns.nvim).
 
 ```
-┌──────────────┬─────────────────┐
-│ EXPLORER     │                 │
-│  lua/        │     buffer      │
-├──────────────┤                 │
-│ SCM│GRAPH│TL │  ← winbar tabs  │
-│  main ↓2 ↑3  │                 │
-│ ▼ Staged   2 │                 │
-│  M config.lua│                 │
-│  A new.lua   │                 │
-│ ▼ Changes  3 │                 │
-│  M init.lua  │                 │
-│  U scratch.md│                 │
-└──────────────┴─────────────────┘
+┌───────────────────┬─────────────────┐
+│ EXPLORER          │                 │
+│  lua/             │                 │
+├───────────────────┤     buffer      │
+│ Files [/] Git Buf │  ← winbar tabs  │
+│ ▼ SOURCE CONTROL  │                 │
+│   main ↓2 ↑3      │                 │
+│  ▼ Staged      2  │                 │
+│    M config.lua   │                 │
+│    A new.lua      │                 │
+│  ▼ Changes     3  │                 │
+│    M init.lua     │                 │
+│    U scratch.md   │                 │
+│ ▶ GRAPH           │                 │
+│ ▶ TIMELINE        │                 │
+└───────────────────┴─────────────────┘
 ```
 
 ## Planned for v1
 
 | Pillar | What it gives you |
 |---|---|
-| **SCM tab** | Collapsible `Staged` / `Changes` / `Untracked` groups, VS Code status letters (`M A D R U C`) and colors, filetype icons, branch + ahead/behind header, commit box, and stage / unstage / discard / commit / fetch / pull / push |
-| **Graph tab** | `git log` rendered with colored per-branch lanes; click a commit to see its files, click a file to open the review view |
-| **Timeline tab** | Per-file history via `git log --follow`, through the same lane renderer |
+| **Sidebar** | Four activity tabs — **Files** (a file tree), **Search** (pattern with case / word / regex toggles, replace, include and exclude globs), **Git**, and **Buffers** (the open buffer list) — in one docked window, clickable and fully keyboard-driven |
+| **Source Control** | The Git tab's first section: collapsible `Staged` / `Changes` / `Untracked` groups, VS Code status letters (`M A D R U C`) and colors, filetype icons, branch + ahead/behind header, commit box, and stage / unstage / discard / commit / fetch / pull / push |
+| **Graph** | `git log` rendered with colored per-branch lanes; click a commit to see its files, click a file to open the review view |
+| **Timeline** | Per-file history via `git log --follow`, through the same lane renderer |
 | **Buffer layer** | Themed signs, current-line blame virtual text, and a clickable gutter — double-click a sign to expand the hunk inline |
 | **Review view** | Two-pane native `diffmode` with right-aligned `[+]` `[↩]` `[⤢]` buttons per hunk |
 
@@ -47,7 +51,7 @@ mode. See [Plan.md](Plan.md) §3.
 - Neovim **0.11+**
 - `git` **2.30+**
 - [gitsigns.nvim](https://github.com/lewis6991/gitsigns.nvim) — required
-- [snacks.nvim](https://github.com/folke/snacks.nvim) — optional, used for the sidebar window
+- [snacks.nvim](https://github.com/folke/snacks.nvim) — optional, used for pickers and notifications
 - [mini.icons](https://github.com/nvim-mini/mini.icons) — optional, used for filetype icons
 
 Run `:checkhealth gitvim` to verify your setup.
@@ -72,7 +76,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 | Command | Does |
 |---|---|
-| `:GitVim open [tab]` | Open the sidebar (`scm`, `graph`, `timeline`) |
+| `:GitVim open [tab]` | Open the sidebar (`files`, `search`, `git`, `buffers`) |
 | `:GitVim close` | Close the sidebar |
 | `:GitVim toggle` | Toggle the sidebar |
 
@@ -90,8 +94,13 @@ require("gitvim").setup({
     position = "left",
     width = 50,
     stack = false,          -- true: share the column with your file explorer
-    tabs = { "scm", "graph", "timeline" },
-    default_tab = "scm",
+    tabs = { "files", "search", "git", "buffers" },
+    default_tab = "git",
+  },
+  git = {
+    -- Sections of the Git tab, and which of them start folded.
+    sections = { "scm", "graph", "timeline" },
+    collapsed = { "graph", "timeline" },
   },
   buffer = {
     blame = true,           -- current-line blame virtual text

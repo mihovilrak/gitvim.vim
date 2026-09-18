@@ -72,7 +72,8 @@ require("gitvim").setup({opts})
 
                                                              *gitvim.open()*
 require("gitvim").open({tab})
-    Open the sidebar, optionally focusing {tab} ("scm", "graph", "timeline").
+    Open the sidebar, optionally focusing {tab} ("files", "search", "git"
+    or "buffers").
 
                                                             *gitvim.close()*
 require("gitvim").close()
@@ -84,8 +85,9 @@ require("gitvim").toggle()
 4. COMMANDS                                                  *gitvim-commands*
 
                                                                     *:GitVim*
-:GitVim open [{tab}]    Open the sidebar. {tab} is "scm", "graph" or
-                        "timeline"; defaults to `sidebar.default_tab`.
+:GitVim open [{tab}]    Open the sidebar. {tab} is "files", "search",
+                        "git" or "buffers"; defaults to
+                        `sidebar.default_tab`.
 :GitVim close           Close the sidebar.
 :GitVim toggle          Toggle the sidebar.
 
@@ -103,9 +105,37 @@ sidebar~
     stack           boolean             default false
                     Share the side column with an existing split (such as
                     your file explorer) instead of opening beside it.
-    tabs            string[]            default { "scm", "graph", "timeline" }
-    default_tab     string              default "scm"
+    tabs            string[]            default { "files", "search", "git",
+                                        "buffers" }
+    default_tab     string              default "git"
     close_on_open   boolean             default false
+
+files~
+    root            "repo"|"cwd"  what the tree is rooted at, default "repo"
+    show_hidden     boolean   show dotfiles, default true
+    show_ignored    boolean   show .gitignore'd files, default false
+    git_status      boolean   tint names by their git status
+    follow_buffer   boolean   reveal the active buffer's file
+
+search~
+    case_sensitive  boolean   initial state of the [Aa] toggle
+    whole_word      boolean   initial state of the [ab] toggle
+    regex           boolean   initial state of the [.*] toggle
+    include         string    initial "files to include" glob
+    exclude         string    initial "files to exclude" glob
+    max_results     number    default 2000
+    confirm_replace boolean   ask before a replace-all writes to disk
+
+git~
+    sections        string[]  default { "scm", "graph", "timeline" }, the
+                              collapsible sections of the Git tab
+    collapsed       string[]  sections folded on first open, default
+                              { "graph", "timeline" }
+
+buffers~
+    show_unlisted   boolean   include buffers hidden from :ls
+    sort            "mru"|"number"|"name"   default "mru"
+    group_by_dir    boolean   group the list by directory
 
 scm~
     groups          string[]  default { "merge", "staged", "changes",
@@ -156,6 +186,32 @@ keymaps~
 
 ==============================================================================
 6. SIDEBAR TABS                                                  *gitvim-tabs*
+
+The sidebar is an activity bar with four tabs, rendered in the window's
+'winbar' and ordered by `sidebar.tabs`. Click one, cycle with <Tab> and
+<S-Tab>, or jump straight to one with 1-4.
+
+FILES                                                           *gitvim-files*
+    A plain file tree rooted at the repository (or at the current directory,
+    per `files.root`). <CR> opens a file in the editor window -- never inside
+    the sidebar -- and toggles a directory. Expansion state is remembered per
+    repository.
+
+SEARCH                                                         *gitvim-search*
+    Labelled with the magnifier icon alone. A form of four fields: Pattern,
+    with VS Code's case-sensitive / whole-word / regular-expression toggles;
+    Replace; Include, and Exclude for file globs. The form's state is kept per
+    repository. Running the search and the replace is not implemented yet.
+
+GIT                                                               *gitvim-git*
+    The project proper: SOURCE CONTROL, GRAPH and TIMELINE as collapsible
+    sections of one scrolling panel, headed by the repository name, the branch
+    and the ahead/behind counters. <CR> or a double-click on a heading folds
+    or unfolds a section, and the state is kept per repository.
+
+BUFFERS                                                       *gitvim-buffers*
+    The open buffers, sorted per `buffers.sort`. The current buffer is marked,
+    modified ones carry a dot, and <CR> shows a buffer in the editor window.
 
 SOURCE CONTROL                                                    *gitvim-scm*
     (planned) Collapsible groups with counts: Merge changes, Staged, Changes,

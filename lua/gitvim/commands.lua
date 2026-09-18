@@ -2,7 +2,7 @@
 
 local M = {}
 
-local TABS = { "scm", "graph", "timeline" }
+local TABS = { "files", "search", "git", "buffers" }
 
 ---@class gitvim.Subcommand
 ---@field run fun(args: string[])
@@ -28,9 +28,12 @@ local subcommands = {
     end,
   },
   toggle = {
-    desc = "toggle the sidebar",
-    run = function()
-      require("gitvim").toggle()
+    desc = "toggle the sidebar, optionally on a tab",
+    run = function(args)
+      require("gitvim").toggle(args[1])
+    end,
+    complete = function()
+      return TABS
     end,
   },
   refresh = {

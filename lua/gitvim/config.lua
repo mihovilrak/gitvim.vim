@@ -4,6 +4,9 @@
 
 local M = {}
 
+---@alias gitvim.Tab "files"|"search"|"git"|"buffers"
+---@alias gitvim.Section "scm"|"graph"|"timeline"
+
 ---@class gitvim.Config
 local defaults = {
   --- Sidebar window.
@@ -14,16 +17,66 @@ local defaults = {
     --- Share the column with an existing side split (e.g. snacks.explorer)
     --- instead of opening beside it. See Plan.md D2.
     stack = false,
-    --- Tabs shown in the winbar, in order.
-    ---@type ("scm"|"graph"|"timeline")[]
-    tabs = { "scm", "graph", "timeline" },
-    ---@type "scm"|"graph"|"timeline"
-    default_tab = "scm",
+    --- Activity tabs shown in the winbar, in order.
+    ---@type gitvim.Tab[]
+    tabs = { "files", "search", "git", "buffers" },
+    ---@type gitvim.Tab
+    default_tab = "git",
     --- Close the sidebar after opening a file from it.
     close_on_open = false,
   },
 
-  --- Source control tab.
+  --- Files tab: a plain file tree rooted at the repository.
+  files = {
+    --- Tree root. "repo" follows the active repository, "cwd" follows :pwd.
+    ---@type "repo"|"cwd"
+    root = "repo",
+    --- Show dotfiles.
+    show_hidden = true,
+    --- Show files matched by .gitignore.
+    show_ignored = false,
+    --- Tint names by their git status.
+    git_status = true,
+    --- Reveal (and select) the active buffer's file when it changes.
+    follow_buffer = true,
+  },
+
+  --- Search tab: the Pattern / Replace / Include / Exclude form.
+  search = {
+    --- Initial state of the Pattern field's toggle buttons.
+    case_sensitive = false,
+    whole_word = false,
+    regex = false,
+    --- Initial glob filters, in `git grep` / ripgrep syntax.
+    include = "",
+    exclude = "",
+    --- Stop after this many matches; keeps a `grep .` from freezing the UI.
+    max_results = 2000,
+    --- Confirm before a replace-all writes to disk.
+    confirm_replace = true,
+  },
+
+  --- Git tab: the project proper. Sections are collapsible and share one
+  --- scrollable panel rather than nesting a second tab row (Plan.md D2).
+  git = {
+    ---@type ("scm"|"graph"|"timeline")[]
+    sections = { "scm", "graph", "timeline" },
+    --- Sections collapsed on first open.
+    ---@type ("scm"|"graph"|"timeline")[]
+    collapsed = { "graph", "timeline" },
+  },
+
+  --- Buffers tab: the open buffer list.
+  buffers = {
+    --- Include buffers hidden from `:ls` (help, terminals, plugin scratch).
+    show_unlisted = false,
+    ---@type "mru"|"number"|"name"
+    sort = "mru",
+    --- Group buffers by their directory.
+    group_by_dir = false,
+  },
+
+  --- SOURCE CONTROL section of the Git tab.
   scm = {
     --- Groups rendered, in order. "merge" stays empty until the conflict UI lands.
     ---@type ("merge"|"staged"|"changes"|"untracked")[]
@@ -37,7 +90,7 @@ local defaults = {
     row_actions = true,
   },
 
-  --- Commit graph tab.
+  --- GRAPH section of the Git tab.
   graph = {
     --- Commits fetched per page; more load on scroll.
     page_size = 256,
@@ -47,7 +100,7 @@ local defaults = {
     show_refs = true,
   },
 
-  --- Timeline tab (history of the active buffer's file).
+  --- TIMELINE section of the Git tab (history of the active buffer's file).
   timeline = {
     page_size = 128,
     --- Follow renames (`git log --follow`).
@@ -88,9 +141,14 @@ local defaults = {
     events = { "BufWritePost", "FocusGained" },
   },
 
-  --- Icons. Falls back to plain ASCII when mini.icons is unavailable.
+  --- Icons. Every glyph has a nerd-font-free stand-in; see ui/icons.lua.
   icons = {
     enabled = true,
+    --- "auto" trusts `vim.g.have_nerd_font`, which LazyVim and kickstart set.
+    ---@type "auto"|"nerd"|"ascii"
+    style = "auto",
+    --- Status letters, shown in the SOURCE CONTROL section. Letters, not
+    --- glyphs: they are what users actually read and need no font.
     ---@type table<string, string>
     status = {
       modified = "M",
@@ -102,11 +160,11 @@ local defaults = {
       ignored = "I",
       conflict = "!",
     },
-    group_open = "",
-    group_closed = "",
-    commit = "",
-    ahead = "",
-    behind = "",
+    --- Replace individual chrome glyphs by name: `files`, `search`, `git`,
+    --- `buffers`, `chevron_open`, `chevron_closed`, `file`, `directory`,
+    --- `directory_open`, `commit`, `ahead`, `behind`.
+    ---@type table<string, string>
+    overrides = {},
   },
 
   --- Set to false to skip all default keymaps.
@@ -125,6 +183,7 @@ M.defaults = defaults
 --- check must not descend into them.
 local FREEFORM = {
   ["icons.status"] = true,
+  ["icons.overrides"] = true,
 }
 
 --- A validator accepting only the listed values.
@@ -197,8 +256,10 @@ end
 --- Validate the merged options, raising on anything that would crash later.
 ---@param o gitvim.Config
 local function validate(o)
-  local tab_names = { "scm", "graph", "timeline" }
+  local tab_names = { "files", "search", "git", "buffers" }
   local is_tab = one_of(tab_names)
+  local section_names = { "scm", "graph", "timeline" }
+  local is_section = one_of(section_names)
   local is_string = function(v)
     return type(v) == "string"
   end
@@ -221,6 +282,27 @@ local function validate(o)
       0
     )
   end
+
+  vim.validate("files.root", o.files.root, one_of({ "repo", "cwd" }))
+  vim.validate("files.show_hidden", o.files.show_hidden, "boolean")
+  vim.validate("files.show_ignored", o.files.show_ignored, "boolean")
+  vim.validate("files.git_status", o.files.git_status, "boolean")
+  vim.validate("files.follow_buffer", o.files.follow_buffer, "boolean")
+
+  vim.validate("search.case_sensitive", o.search.case_sensitive, "boolean")
+  vim.validate("search.whole_word", o.search.whole_word, "boolean")
+  vim.validate("search.regex", o.search.regex, "boolean")
+  vim.validate("search.include", o.search.include, "string")
+  vim.validate("search.exclude", o.search.exclude, "string")
+  vim.validate("search.max_results", o.search.max_results, min_int(1))
+  vim.validate("search.confirm_replace", o.search.confirm_replace, "boolean")
+
+  vim.validate("git.sections", o.git.sections, list_of(is_section, "section names"))
+  vim.validate("git.collapsed", o.git.collapsed, list_of(is_section, "section names"))
+
+  vim.validate("buffers.show_unlisted", o.buffers.show_unlisted, "boolean")
+  vim.validate("buffers.sort", o.buffers.sort, one_of({ "mru", "number", "name" }))
+  vim.validate("buffers.group_by_dir", o.buffers.group_by_dir, "boolean")
 
   local is_group = one_of({ "merge", "staged", "changes", "untracked", "ignored" })
   vim.validate("scm.groups", o.scm.groups, list_of(is_group, "group names"))
@@ -251,12 +333,14 @@ local function validate(o)
   vim.validate("refresh.events", o.refresh.events, list_of(is_string, "autocmd names"))
 
   vim.validate("icons.enabled", o.icons.enabled, "boolean")
+  vim.validate("icons.style", o.icons.style, one_of({ "auto", "nerd", "ascii" }))
   vim.validate("icons.status", o.icons.status, "table")
   for name, icon in pairs(o.icons.status) do
     vim.validate(("icons.status.%s"):format(name), icon, "string")
   end
-  for _, name in ipairs({ "group_open", "group_closed", "commit", "ahead", "behind" }) do
-    vim.validate(("icons.%s"):format(name), o.icons[name], "string")
+  vim.validate("icons.overrides", o.icons.overrides, "table")
+  for name, icon in pairs(o.icons.overrides) do
+    vim.validate(("icons.overrides.%s"):format(name), icon, "string")
   end
 
   vim.validate("keymaps.enabled", o.keymaps.enabled, "boolean")
