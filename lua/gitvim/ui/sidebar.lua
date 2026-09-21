@@ -40,6 +40,9 @@ local sb = {
   --- The window a file should open in.
   ---@type integer?
   editor_win = nil,
+  --- Set while a `reach` action runs, so the redraw it causes cannot
+  --- re-enter it.
+  reaching = false,
   wired = false,
 }
 
@@ -152,7 +155,12 @@ end
 --- Actions every tab gets for free.
 ---@type table<string, fun(ctx: gitvim.ui.TabCtx, arg: any, row: gitvim.render.Row)>
 local GLOBAL_ACTIONS = {
-  refresh = function()
+  refresh = function(c)
+    -- An explicit refresh re-reads history too, which the status signature
+    -- alone would miss (a new tag, a fetched remote branch).
+    if c.store then
+      c.store:mark_dirty("graph")
+    end
     require("gitvim").refresh(function(err)
       if err then
         vim.notify(require("gitvim.git.cli").format_error(err), vim.log.levels.ERROR)
@@ -195,6 +203,29 @@ local function dispatch(action, arg, row)
     return
   end
   M.redraw()
+end
+
+--- Rows that page more content in (`row.reach`) fire when they come within a
+--- screenful of the view, so scrolling towards the end of the graph loads
+--- the next page before it is reached.
+local function reach()
+  if sb.reaching or not M.is_open() or not sb.renderer then
+    return
+  end
+  local info = vim.fn.getwininfo(sb.win.win)[1]
+  if not info then
+    return
+  end
+  local last = math.min(info.botline + info.height, vim.api.nvim_buf_line_count(sb.win.buf))
+  for lnum = info.topline, last do
+    local row = sb.renderer:at(lnum)
+    if row and row.reach then
+      sb.reaching = true
+      dispatch(row.reach, row.arg, row)
+      sb.reaching = false
+      return
+    end
+  end
 end
 
 --- The row under the cursor, or nil when the sidebar is not focused.
@@ -359,6 +390,7 @@ function M.redraw()
     pcall(vim.api.nvim_win_set_cursor, sb.win.win, { want, 0 })
   end
   sb.cursor[sb.tab] = want
+  reach()
 end
 
 -- ---------------------------------------------------------------------------
@@ -469,7 +501,19 @@ local function wire()
     end,
   })
 
-  for _, event in ipairs({ "status", "head" }) do
+  vim.api.nvim_create_autocmd({ "CursorMoved", "WinScrolled" }, {
+    group = group,
+    desc = "gitvim: load the next page as it scrolls into view",
+    callback = function(args)
+      local here = args.event == "WinScrolled" and tonumber(args.match)
+        or vim.api.nvim_get_current_win()
+      if sb.win and here == sb.win.win then
+        reach()
+      end
+    end,
+  })
+
+  for _, event in ipairs({ "status", "head", "graph" }) do
     state.subscribe(event, function()
       if M.is_open() then
         vim.schedule(M.redraw)
@@ -589,6 +633,7 @@ function M.reset()
     mapped = {},
     pending = nil,
     editor_win = nil,
+    reaching = false,
     wired = false,
   }
 end

@@ -386,16 +386,16 @@ describe("Git tab", function()
     local rows = git.rows(ctx)
     -- scm is open by default, graph and timeline are not.
     assert.is_true(has(rows, "Loading status"))
-    assert.is_false(has(rows, "No commits loaded yet"))
+    assert.is_false(has(rows, "Loading history"))
   end)
 
   it("toggles a section, and remembers it in the store", function()
     git.actions.toggle_section(ctx, "graph")
-    assert.is_true(has(git.rows(ctx), "No commits loaded yet"))
+    assert.is_true(has(git.rows(ctx), "Loading history"))
     assert.is_true(ctx.store.collapsed["section:graph"] == false)
 
     git.actions.toggle_section(ctx, "graph")
-    assert.is_false(has(git.rows(ctx), "No commits loaded yet"))
+    assert.is_false(has(git.rows(ctx), "Loading history"))
   end)
 
   it("keeps collapse state per repository", function()

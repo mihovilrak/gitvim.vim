@@ -7,6 +7,7 @@
 --- them: the branch header, the chevrons and the collapse state.
 
 local config = require("gitvim.config")
+local graph = require("gitvim.ui.sections.graph")
 local icons = require("gitvim.ui.icons")
 local scm = require("gitvim.ui.sections.scm")
 local tabs = require("gitvim.ui.tabs")
@@ -75,12 +76,7 @@ end
 ---@type table<string, fun(ctx: gitvim.ui.TabCtx): gitvim.render.Row[]>
 local BODIES = {
   scm = scm.rows,
-  graph = function(ctx)
-    if ctx.store and ctx.store.graph_commit then
-      return { tabs.hint("Selected commit " .. ctx.store.graph_commit:sub(1, 12), 2) }
-    end
-    return { tabs.hint("No commits loaded yet.", 2) }
-  end,
+  graph = graph.rows,
   timeline = function()
     return { tabs.hint("No file history yet.", 2) }
   end,
@@ -131,6 +127,9 @@ M.actions = {
   discard = scm.actions.discard,
   toggle_stage = scm.actions.toggle_stage,
   commit = scm.actions.commit,
+  graph_toggle = graph.actions.graph_toggle,
+  graph_open = graph.actions.graph_open,
+  graph_more = graph.actions.graph_more,
 
   stage_all = function()
     require("gitvim.actions").stage_all()
@@ -157,7 +156,8 @@ M.actions = {
     require("gitvim.actions").push()
   end,
 
-  --- Toggle whichever kind of collapsible header is under the cursor.
+  --- Toggle whichever kind of collapsible row is under the cursor: a section,
+  --- an SCM group or a GRAPH commit.
   ---@param ctx gitvim.ui.TabCtx
   ---@param arg string
   ---@param row gitvim.render.Row
@@ -166,6 +166,8 @@ M.actions = {
       M.actions.toggle_section(ctx, arg)
     elseif row and row.action == "toggle_group" then
       M.actions.toggle_group(ctx, arg)
+    elseif row and row.action == "graph_toggle" then
+      M.actions.graph_toggle(ctx, arg)
     end
   end,
 }

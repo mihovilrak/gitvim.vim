@@ -286,9 +286,27 @@ COMMIT EDITOR                                                  *gitvim-commit*
     or `scm.signoff`, adds a Signed-off-by trailer.
 
 GRAPH                                                           *gitvim-graph*
-    (planned) `git log` rendered with per-branch coloured lanes. Selecting a
-    commit lists its changed files; selecting a file opens |gitvim-review| for
-    that commit against its parent.
+    The history of every branch, remote and tag, newest first, drawn with
+    per-branch coloured lanes. Each commit row shows its `●` node (HEAD's in
+    its own colour), ref badges -- the current branch, other local branches,
+    remotes and tags each in their own colour, hidden with
+    `graph.show_refs = false` -- then the subject, with the author and the
+    date (`graph.date_format`) at the right edge.
+
+    History arrives `graph.page_size` commits at a time: scrolling the
+    "Load more…" row into view fetches the next page, and the lanes carry on
+    across it. The graph reloads itself when HEAD, the branch or its
+    upstream moves.
+
+        <CR>        on a commit: list its changed files, or fold them again;
+                    on a file: open |gitvim-review| for that commit against
+                    its first parent (a root commit against the empty tree)
+        za <Space>  fold or unfold a commit's files
+        o           open a listed file as it is in the worktree
+        R           reload the history
+
+    `:GitVim blame-commit` (or `hB` in a buffer) selects a line's commit
+    here, loading further pages until it is found.
 
 TIMELINE                                                     *gitvim-timeline*
     (planned) History of one file via `git log --follow`, rendered through the

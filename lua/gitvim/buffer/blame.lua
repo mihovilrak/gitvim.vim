@@ -18,9 +18,9 @@ end
 
 --- Select the blamed commit for the current line in the GRAPH section.
 ---
---- Phase 7 consumes `store.graph_commit` when its renderer arrives. Until
---- then the expanded section still exposes the selected revision, making the
---- navigation contract useful rather than silently dropping the request.
+--- The section consumes `store.graph_commit` on its next render: it pages
+--- history in until the commit turns up, expands it to its files and moves
+--- the cursor onto it.
 ---@param bufnr? integer
 function M.open_commit(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()

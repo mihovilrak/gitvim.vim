@@ -25,6 +25,7 @@ local M = {}
 ---@field arg? any
 ---@field data? any        the domain object this row stands for
 ---@field virt? gitvim.render.Chunk[]  right-aligned virtual text (never virt_lines)
+---@field reach? string    dispatched when the row scrolls near the view (paging)
 
 --- Click handlers reachable from `'winbar'` / `'statusline'` `%@` items, which
 --- can only call a global. Keyed by name; `register()` owns the table.

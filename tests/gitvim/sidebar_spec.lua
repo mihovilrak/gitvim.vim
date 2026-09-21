@@ -413,7 +413,35 @@ describe("sidebar actions", function()
     press("<CR>")
 
     assert.is_true(state.get(root).collapsed["section:graph"] == false)
-    assert.is_number(line_matching("No commits loaded yet"), "the section should have opened")
+    assert.is_number(
+      line_matching("Loading history") or line_matching("merge branch"),
+      "the section should have opened"
+    )
+  end)
+
+  it("pages the GRAPH in as its tail scrolls into view", function()
+    config.setup({ graph = { page_size = 2 } })
+    local store = state.get(root)
+    local _, result = await(function(done)
+      require("gitvim.git.status").get(root, nil, done)
+    end)
+    store:set_status(result)
+    vim.api.nvim_win_set_cursor(sidebar_win(), { line_matching("GRAPH"), 0 })
+    press("<CR>")
+
+    -- The whole five-commit history fits on screen, so each page's tail is
+    -- in view the moment it lands and pulls in the next one.
+    local ok = vim.wait(5000, function()
+      local graph = store.graph
+      return graph ~= nil and #graph.commits == 5 and not graph.loading
+    end, 10)
+    assert.is_true(ok, "every page should have loaded")
+    assert.is_nil(store.graph.next)
+    vim.wait(1000, function()
+      return line_matching("chore") ~= nil
+    end, 10)
+    assert.is_number(line_matching("chore"), "the last page should be drawn")
+    assert.is_nil(line_matching("Load more"))
   end)
 
   it("resolves a click to the chunk under the mouse", function()
