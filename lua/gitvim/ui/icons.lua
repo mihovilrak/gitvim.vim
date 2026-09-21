@@ -31,6 +31,8 @@ local NERD = {
   stage = "[+]",
   unstage = "[−]",
   discard = "[↩]",
+  -- Review view hunk button (the other three are shared with the rows).
+  expand = "[⤢]",
 }
 
 --- Text stand-ins, chosen to be the same display width or narrower.
@@ -52,6 +54,7 @@ local ASCII = {
   stage = "[+]",
   unstage = "[-]",
   discard = "[<]",
+  expand = "[^]",
 }
 
 ---@return boolean

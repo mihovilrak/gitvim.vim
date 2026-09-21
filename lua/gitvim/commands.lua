@@ -117,6 +117,16 @@ local subcommands = {
       require("gitvim.actions").discard_file()
     end,
   },
+  review = {
+    desc = "review the current file against the index, or against [rev]",
+    run = function(args)
+      local rev = args and args[1]
+      require("gitvim.ui.review").open_file(nil, rev and { left_rev = rev } or nil)
+    end,
+    complete = function()
+      return { "HEAD", "HEAD~1", "@{upstream}" }
+    end,
+  },
   ["stage-all"] = scm("stage every change", "stage_all"),
   ["unstage-all"] = scm("unstage everything", "unstage_all"),
   ["discard-all"] = scm("discard every working-tree change", "discard_all"),

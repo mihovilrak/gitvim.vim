@@ -76,6 +76,10 @@ local LINKS = {
   GitVimButton = "Comment",
   GitVimButtonActive = "Special",
 
+  -- Review view: per-hunk [+] [↩] [⤢] and the pane labels.
+  GitVimHunkButton = "Special",
+  GitVimReviewLabel = "Title",
+
   -- Search tab form.
   GitVimLabel = "Label",
   GitVimField = "NormalFloat",

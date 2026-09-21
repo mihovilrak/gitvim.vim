@@ -128,6 +128,14 @@ function M.refresh(path, cb)
   end)
 end
 
+--- Open the two-pane review for one file (Plan.md Phase 6).
+---@param root string
+---@param path string  repository-relative
+---@param opts? gitvim.review.Opts  `{ left_rev, right_rev, left_path }`
+function M.review(root, path, opts)
+  require("gitvim.ui.review").open(root, path, opts)
+end
+
 ---@return gitvim.Config
 function M.config()
   return require("gitvim.config").options

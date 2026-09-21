@@ -52,6 +52,7 @@ local DEFAULT_TIMEOUT = 30000
 ---@field stdin? string
 ---@field env? table<string, string>
 ---@field timeout? integer
+---@field text? boolean  normalise CRLF in the output (default true); false keeps bytes exact
 
 --- stderr patterns -> error kind, first match wins.
 ---
@@ -184,7 +185,7 @@ function M.run(args, opts, cb)
     stdin = opts.stdin,
     env = opts.env,
     timeout = opts.timeout or DEFAULT_TIMEOUT,
-    text = true,
+    text = opts.text ~= false,
   }, function(out)
     local res = normalize(out)
     if res.code ~= 0 then
@@ -230,7 +231,7 @@ function M.sync(args, opts)
         stdin = opts.stdin,
         env = opts.env,
         timeout = opts.timeout or DEFAULT_TIMEOUT,
-        text = true,
+        text = opts.text ~= false,
       })
       :wait()
   end)

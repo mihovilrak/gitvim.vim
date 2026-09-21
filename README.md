@@ -1,8 +1,8 @@
 # gitvim.nvim
 
 > **Status: pre-alpha, under active development.** The sidebar shell, the Source
-> Control view with its Git actions, and the in-buffer layer are in place; the review,
-> graph and timeline views are being built. See
+> Control view with its Git actions, the in-buffer layer and the review view are in
+> place; the graph and timeline views are being built. See
 > [Plan.md](Plan.md) for the full design and the task checklist.
 
 A VS Code-shaped Git workbench for Neovim, built for LazyVim.
@@ -41,7 +41,7 @@ delegates the in-buffer layer to [gitsigns.nvim](https://github.com/lewis6991/gi
 | **Graph** | `git log` rendered with colored per-branch lanes; click a commit to see its files, click a file to open the review view |
 | **Timeline** | Per-file history via `git log --follow`, through the same lane renderer |
 | **Buffer layer** | Themed signs, current-line blame virtual text, and a clickable gutter — double-click a sign to expand the hunk inline |
-| **Review view** | Two-pane native `diffmode` with right-aligned `[+]` `[↩]` `[⤢]` buttons per hunk |
+| **Review view** | Two-pane native `diffmode` (index \| working tree, or HEAD \| index for staged rows) with right-aligned `[+]` `[↩]` `[⤢]` buttons per hunk — stage, revert, expand |
 
 Post-MVP, in priority order: merge conflict UI, stashes and branch management,
 multi-repo / submodules / worktrees, a neo-tree source adapter, and a zero-dependency
@@ -87,6 +87,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 | `:GitVim commit [--amend] [--signoff]` | Open the commit message editor |
 | `:GitVim fetch` / `pull` / `push` | Remote operations; `push` publishes a branch that has no upstream |
 | `:GitVim checkout` | Switch to another local branch |
+| `:GitVim review [rev]` | Review the current file against the index, or against `rev` |
 
 `:GitVim` supports completion for its subcommands and the commit flags.
 Every discard asks for confirmation first (`scm.confirm_discard`).
@@ -100,13 +101,13 @@ rows and group headers carry right-aligned buttons: `[+]` stage, `[−]` unstage
 
 | Key | Does | Key | Does |
 |---|---|---|---|
-| `<CR>` | Open the file | `c` | Commit |
+| `<CR>` | Open the review view | `c` | Commit |
 | `s` | Stage the row (a header: the group) | `C` | Amend HEAD |
 | `u` | Unstage the row | `b` | Check out a branch |
 | `x` | Discard the row | `f` | Fetch |
 | `-` | Toggle staged | `p` | Pull |
 | `S` / `U` / `X` | Stage / unstage / discard all | `P` | Push |
-| `za` / `<Space>` | Fold a group or section | | |
+| `za` / `<Space>` | Fold a group or section | `o` | Open the file itself |
 
 The commit editor is a floating `gitcommit` buffer: `<C-Enter>` (or `<C-s>`)
 commits, `q` / `<Esc>` closes. What you type is kept as the repository's

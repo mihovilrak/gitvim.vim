@@ -108,6 +108,9 @@ require("gitvim").toggle()
 :GitVim push            Push the current branch. A branch without an
                         upstream is published with `--set-upstream`.
 :GitVim checkout        Pick another local branch and switch to it.
+:GitVim review [{rev}]  Open |gitvim-review| for the current file: the
+                        index against the working tree, or {rev} against
+                        the working tree.
 :GitVim refresh         Re-read git status for the current repository.
 :GitVim status          Echo a one-line summary of the repository.
 :GitVim health          Run |:checkhealth| gitvim.
@@ -253,7 +256,8 @@ SOURCE CONTROL                                                    *gitvim-scm*
     with ASCII icons) -- showing only the ones that apply. Click a button,
     or use the keys:
 
-        <CR>        open the file; fold a group or section on a header
+        <CR>        open |gitvim-review|; fold a group or section on a header
+        o           open the file itself
         s           stage the row (on a header: the whole group)
         u           unstage the row
         x           discard the row, after confirmation
@@ -293,10 +297,49 @@ TIMELINE                                                     *gitvim-timeline*
 ==============================================================================
 7. REVIEW VIEW                                                 *gitvim-review*
 
-(planned) A two-pane diff using Neovim's native diff mode, so filler lines,
-scrollbind, folding of unchanged regions and word-level highlighting all come
-from the editor itself. Each hunk carries right-aligned `[+]` `[<]` `[^]`
-buttons for stage, revert and expand.
+A two-pane diff using Neovim's native diff mode, so filler lines, scrollbind,
+folding of unchanged regions and word-level highlighting all come from the
+editor itself. The right pane takes over the editor window; the left pane is
+split off beside it. `review.diffopt` is merged into 'diffopt' while the view
+is open and the old value is restored when it closes.
+
+<CR> on a SOURCE CONTROL row opens it: a Changes or Untracked row shows the
+index against the working tree, a Staged row shows HEAD against the index.
+Conflicted files and submodules open as plain files. |:GitVim| review opens
+the current buffer's file. From Lua: >lua
+
+    require("gitvim").review(root, path, {
+      left_rev = "HEAD~1",   -- default ":" (the index)
+      right_rev = "HEAD",    -- default: the working tree; ":" for the index
+      left_path = "old.lua", -- the left side's path, for a rename
+    })
+<
+Each hunk carries right-aligned buttons, shown only where they apply:
+
+    `[+]`   stage the hunk          index | working tree
+    `[−]`   unstage the hunk        HEAD | index
+    `[↩]`   revert the hunk         any rev | working tree, after confirmation
+    `[⤢]`   expand: unfold all the context, and fold it back
+
+With ASCII icons they read `[+]` `[-]` `[<]` `[^]`. `review.hunk_actions =
+false` hides them; the keys still work. The buttons are never virtual lines,
+which would push one pane out of line with the other. Keys, in either pane:
+
+    ]h  [h      next / previous hunk
+    s           stage the hunk under the cursor
+    u           unstage it
+    x           revert it (a buffer with unsaved changes is left alone)
+    o           expand / collapse the context
+    R           reload both panes
+    q           close the review
+
+`keymaps.prefix` .. `hs` / `hu` / `hr` work too when `keymaps.enabled` is set.
+Staging writes the new index blob directly (`git hash-object` and `git
+update-index`), so a hunk is staged exactly as shown, line endings included.
+Deleted, untracked and renamed files work like any other; binary files,
+symlinks and submodules are shown as a placeholder without hunks.
+
+`layout = "unified"` is not implemented yet and falls back to "split".
 
 ==============================================================================
 8. BUFFER LAYER                                                *gitvim-buffer*

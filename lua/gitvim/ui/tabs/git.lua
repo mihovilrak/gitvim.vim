@@ -125,6 +125,7 @@ M.actions = {
 
   toggle_group = scm.actions.toggle_group,
   open = scm.actions.open,
+  open_file = scm.actions.open_file,
   stage = scm.actions.stage,
   unstage = scm.actions.unstage,
   discard = scm.actions.discard,
@@ -188,6 +189,7 @@ M.keys = {
   ["f"] = "fetch",
   ["p"] = "pull",
   ["P"] = "push",
+  ["o"] = "open_file",
 }
 
 return M

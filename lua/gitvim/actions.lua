@@ -65,7 +65,7 @@ end
 ---@param prompt string
 ---@param yes string
 ---@param fn fun()
-local function confirm(prompt, yes, fn)
+function M.confirm(prompt, yes, fn)
   if not config.options.scm.confirm_discard then
     fn()
     return
@@ -114,7 +114,7 @@ function M.discard(entries, cb)
   else
     prompt = ("Discard changes to %d files?"):format(#entries)
   end
-  confirm(prompt, "Discard", function()
+  M.confirm(prompt, "Discard", function()
     require("gitvim.git.stage").discard(repo.root, entries, finish(repo.root, cb))
   end)
 end
@@ -141,9 +141,13 @@ function M.discard_all(cb)
   if not repo then
     return
   end
-  confirm("Discard ALL working-tree changes and delete untracked files?", "Discard all", function()
-    require("gitvim.git.stage").discard_all(repo.root, finish(repo.root, cb))
-  end)
+  M.confirm(
+    "Discard ALL working-tree changes and delete untracked files?",
+    "Discard all",
+    function()
+      require("gitvim.git.stage").discard_all(repo.root, finish(repo.root, cb))
+    end
+  )
 end
 
 --- The status entries of one sidebar group, e.g. to stage all of Untracked.

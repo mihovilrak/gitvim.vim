@@ -114,6 +114,13 @@ local function editor_window()
   return win
 end
 
+--- The window files open in: never the sidebar, created beside it if need be.
+--- The review view takes it over for its right-hand pane.
+---@return integer
+function M.editor_window()
+  return editor_window()
+end
+
 --- Show a file in the editor window.
 ---@param path string
 function M.open_file(path)

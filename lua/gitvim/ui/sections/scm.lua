@@ -247,12 +247,32 @@ M.actions = {
     end
   end,
 
-  --- Open a changed file in the main window.
+  --- Open a changed file in the review view: HEAD vs index for a staged
+  --- row, index vs working tree otherwise. A conflict or a submodule has no
+  --- two sides to compare, so it opens as a file.
   ---@param ctx gitvim.ui.TabCtx
   ---@param path string  repository-relative
-  open = function(ctx, path)
-    if ctx.repo and path then
+  ---@param row? gitvim.render.Row
+  open = function(ctx, path, row)
+    if not (ctx.repo and path) then
+      return
+    end
+    local entry = row and row.data
+    if entry and entry.path and entry.group ~= "merge" and not entry.submodule then
+      require("gitvim.ui.review").open_entry(ctx.repo.root, entry)
+    else
       require("gitvim.ui.sidebar").open_file(ctx.repo.root .. "/" .. path)
+    end
+  end,
+
+  --- Open the working-tree file itself, skipping the review.
+  ---@param ctx gitvim.ui.TabCtx
+  ---@param path string  repository-relative
+  ---@param row? gitvim.render.Row
+  open_file = function(ctx, path, row)
+    local entry = row and row.data
+    if ctx.repo and entry and entry.path then
+      require("gitvim.ui.sidebar").open_file(ctx.repo.root .. "/" .. entry.path)
     end
   end,
 
