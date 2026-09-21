@@ -57,6 +57,7 @@ local LINKS = {
   GitVimBufferCurrent = "Special", -- the buffer the editor window is showing
   GitVimError = "DiagnosticError",
   GitVimSeparator = "WinSeparator",
+  GitVimBlame = "Comment",
 
   -- Branch header.
   GitVimBranch = "Identifier",

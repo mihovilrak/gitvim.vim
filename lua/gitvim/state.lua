@@ -32,6 +32,7 @@ local M = {}
 ---@field collapsed table<string, boolean>  sidebar group collapse, per repo
 ---@field expanded table<string, boolean>   Files tab: expanded directories, per repo
 ---@field draft string                      unsent commit message, per repo
+---@field graph_commit? string              commit requested by cross-navigation
 ---@field search gitvim.state.Search        Search tab form contents, per repo
 ---@field dirty table<gitvim.state.Slot, boolean>
 local Store = {}

@@ -539,6 +539,26 @@ function M.focus(tab)
   M.open(tab)
 end
 
+--- Move the cursor to a rendered action target. Cross-navigation (for
+--- example blame -> GRAPH) uses this after opening the appropriate tab.
+---@param action string
+---@param arg? any
+---@return boolean found
+function M.reveal(action, arg)
+  if not M.is_open() or not sb.renderer or not sb.win then
+    return false
+  end
+  for lnum = 1, vim.api.nvim_buf_line_count(sb.win.buf) do
+    local row = sb.renderer:at(lnum)
+    if row and row.action == action and (arg == nil or row.arg == arg) then
+      vim.api.nvim_win_set_cursor(sb.win.win, { lnum, 0 })
+      sb.cursor[sb.tab] = lnum
+      return true
+    end
+  end
+  return false
+end
+
 --- Apply changed `sidebar.*` options to a live window.
 function M.reconfigure()
   if sb.win then

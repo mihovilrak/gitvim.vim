@@ -41,7 +41,27 @@ function M.setup(opts)
   require("gitvim.config").setup(opts)
   require("gitvim.commands").setup()
   require("gitvim.ui.hl").setup()
-  -- Later phases install the refresh watcher and buffer integrations.
+  local buffer_opts = require("gitvim.config").options.buffer
+  -- gitsigns is optional at runtime: the bridge makes these calls inert when
+  -- it is missing, while :checkhealth still explains how to install it.
+  require("gitvim.buffer.bridge").setup({
+    current_line_blame = buffer_opts.blame,
+    current_line_blame_formatter = buffer_opts.blame_format,
+  })
+  require("gitvim.buffer.signs").setup()
+  -- A later phase installs the repository refresh watcher.
+end
+
+--- Toggle current-line blame annotations.
+---@param value? boolean
+---@return boolean? enabled
+function M.toggle_blame(value)
+  return require("gitvim.buffer.blame").toggle(value)
+end
+
+--- Open the commit blamed for the current line in the Git graph.
+function M.open_blame_commit()
+  require("gitvim.buffer.blame").open_commit()
 end
 
 --- Open (and focus) the sidebar.

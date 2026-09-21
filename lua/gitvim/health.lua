@@ -77,7 +77,7 @@ end
 
 local function check_plugins()
   -- Required: gitvim delegates the whole in-buffer layer to gitsigns (D1).
-  if pcall(require, "gitsigns") then
+  if require("gitvim.buffer.bridge").available() then
     vim.health.ok("gitsigns.nvim found")
   else
     vim.health.error("gitsigns.nvim not found", {
@@ -88,7 +88,7 @@ local function check_plugins()
 
   -- Optional niceties.
   for _, spec in ipairs({
-    { "snacks", "snacks.nvim (sidebar window)" },
+    { "snacks", "snacks.nvim (pickers and notifications)" },
     { "mini.icons", "mini.icons (filetype icons)" },
   }) do
     if pcall(require, spec[1]) then

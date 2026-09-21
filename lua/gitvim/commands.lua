@@ -46,6 +46,18 @@ local subcommands = {
       end)
     end,
   },
+  blame = {
+    desc = "toggle current-line blame",
+    run = function()
+      require("gitvim").toggle_blame()
+    end,
+  },
+  ["blame-commit"] = {
+    desc = "open the current line's commit in the Git graph",
+    run = function()
+      require("gitvim").open_blame_commit()
+    end,
+  },
   status = {
     desc = "echo a one-line summary of the current repository",
     run = function()

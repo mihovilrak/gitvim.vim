@@ -90,6 +90,8 @@ require("gitvim").toggle()
                         `sidebar.default_tab`.
 :GitVim close           Close the sidebar.
 :GitVim toggle          Toggle the sidebar.
+:GitVim blame           Toggle current-line blame.
+:GitVim blame-commit    Select the current line's commit in GRAPH.
 
 Subcommands complete with <Tab>.
 
@@ -240,10 +242,22 @@ buttons for stage, revert and expand.
 ==============================================================================
 8. BUFFER LAYER                                                *gitvim-buffer*
 
-(planned) gitvim themes gitsigns' signs, shows current-line blame as virtual
-text, and installs an optional clickable gutter: double-clicking a sign
-expands that hunk inline, right-clicking opens a hunk action menu. Every mouse
-interaction also has a keymap under `keymaps.prefix`.
+gitvim themes gitsigns' signs with the same semantic colours as the sidebar,
+shows current-line blame as virtual text, and installs an optional clickable
+gutter. Double-clicking a sign expands that hunk inline; right-clicking opens
+a hunk action menu. An existing 'statuscolumn', including a dynamic one such
+as snacks.statuscolumn, is composed rather than replaced.
+
+Default mappings (under `keymaps.prefix`, `<leader>g` by default):
+
+    hs    stage hunk                 hu    undo last staged hunk
+    hr    reset hunk                 hp    preview hunk inline
+    hb    show line blame            tb    toggle current-line blame
+    hB    select blamed commit in GRAPH
+
+Existing buffer-local mappings are never replaced. The public Lua helpers
+`require("gitvim").toggle_blame()` and
+`require("gitvim").open_blame_commit()` provide the same blame actions.
 
 ==============================================================================
 9. HIGHLIGHTS                                              *gitvim-highlights*
@@ -257,6 +271,7 @@ they follow your colorscheme.
     GitVimUntracked         untracked file
     GitVimRenamed           renamed file
     GitVimConflict          unmerged file
+    GitVimBlame             current-line blame text
     GitVimGraphLane1..8     graph lane palette
 
 Override with |:highlight| after your colorscheme loads.

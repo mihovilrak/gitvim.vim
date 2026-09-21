@@ -75,7 +75,10 @@ end
 ---@type table<string, fun(ctx: gitvim.ui.TabCtx): gitvim.render.Row[]>
 local BODIES = {
   scm = scm.rows,
-  graph = function()
+  graph = function(ctx)
+    if ctx.store and ctx.store.graph_commit then
+      return { tabs.hint("Selected commit " .. ctx.store.graph_commit:sub(1, 12), 2) }
+    end
     return { tabs.hint("No commits loaded yet.", 2) }
   end,
   timeline = function()

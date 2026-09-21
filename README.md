@@ -1,7 +1,7 @@
 # gitvim.nvim
 
 > **Status: pre-alpha, under active development.** The sidebar shell and read-only
-> Source Control view are in place; Git actions and the other views are being built. See
+> Source Control view plus the in-buffer layer are in place; Git actions and the other views are being built. See
 > [Plan.md](Plan.md) for the full design and the task checklist.
 
 A VS Code-shaped Git workbench for Neovim, built for LazyVim.
@@ -79,8 +79,25 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 | `:GitVim open [tab]` | Open the sidebar (`files`, `search`, `git`, `buffers`) |
 | `:GitVim close` | Close the sidebar |
 | `:GitVim toggle` | Toggle the sidebar |
+| `:GitVim blame` | Toggle current-line blame |
+| `:GitVim blame-commit` | Select the current line's commit in the Git graph |
 
 `:GitVim` supports completion for its subcommands.
+
+The default in-buffer mappings use `keymaps.prefix` (`<leader>g`):
+
+| Mapping | Does |
+|---|---|
+| `<leader>ghs` | Stage the hunk under the cursor |
+| `<leader>ghu` | Undo the last staged hunk |
+| `<leader>ghr` | Reset the hunk under the cursor |
+| `<leader>ghp` | Preview the hunk inline |
+| `<leader>ghb` | Show line blame |
+| `<leader>gtb` | Toggle current-line blame |
+| `<leader>ghB` | Select the blamed commit in GRAPH |
+
+Double-click a gitsign to preview its hunk inline, or right-click it for the
+hunk action menu. Existing buffer-local mappings and custom status columns are preserved.
 
 ## Configuration
 
