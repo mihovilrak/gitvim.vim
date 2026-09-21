@@ -16,6 +16,7 @@ local M = {}
 ---| "head"     # branch/upstream/ahead-behind changed; payload { root, branch }
 ---| "dirty"    # a slot was invalidated; payload { root, slot }
 ---| "graph"    # the GRAPH history or an expanded commit arrived; payload { root }
+---| "timeline" # a file's TIMELINE history arrived; payload { root }
 ---| "error"    # a git call failed; payload { root, err }
 
 ---@class gitvim.state.Search
@@ -35,6 +36,7 @@ local M = {}
 ---@field draft string                      unsent commit message, per repo
 ---@field graph_commit? string              commit requested by cross-navigation
 ---@field graph? gitvim.graph.State         GRAPH history, loaded by its section
+---@field timeline? gitvim.timeline.State   TIMELINE file and history, per repo
 ---@field search gitvim.state.Search        Search tab form contents, per repo
 ---@field dirty table<gitvim.state.Slot, boolean>
 local Store = {}

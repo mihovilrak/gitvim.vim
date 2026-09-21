@@ -111,6 +111,10 @@ require("gitvim").toggle()
 :GitVim review [{rev}]  Open |gitvim-review| for the current file: the
                         index against the working tree, or {rev} against
                         the working tree.
+:GitVim timeline [{path}]
+                        Show a file's history in |gitvim-timeline|:
+                        {path} is pinned there; without it, the current
+                        file is shown (unless another file is pinned).
 :GitVim refresh         Re-read git status for the current repository.
 :GitVim status          Echo a one-line summary of the repository.
 :GitVim health          Run |:checkhealth| gitvim.
@@ -309,8 +313,36 @@ GRAPH                                                           *gitvim-graph*
     here, loading further pages until it is found.
 
 TIMELINE                                                     *gitvim-timeline*
-    (planned) History of one file via `git log --follow`, rendered through the
-    same lane engine as the graph.
+    The history of one file, newest first, drawn through the same lane
+    engine and row layout as GRAPH: node, ref badges, subject, author and
+    date. With `timeline.follow_renames` (the default) it runs through
+    `git log --follow`, so the history carries on past a rename; the commit
+    that renamed or copied the file gets an extra "renamed from {old}" row.
+
+    The section follows the file in the active editor window. Scratch and
+    special buffers, and files outside the repository, leave the last file
+    in place. Pin a file to keep it while you move around; with
+    `timeline.follow_buffer = false` the first file shown is pinned for you.
+    History arrives `timeline.page_size` revisions at a time, and scrolling
+    the "Load more…" row into view fetches the next page. The pages come
+    from one `git log`, paused between pages, so deep history is read only
+    once; after 30 seconds idle it is ended, and started again when the next
+    page is asked for. The timeline reloads itself on every refresh and whenever HEAD, the branch or its
+    upstream moves.
+
+    An untracked file says so without asking git, a staged file that has
+    never been committed shows "Not committed yet.", and a file git has
+    never seen shows "No history.".
+
+        <CR>        on a revision: open |gitvim-review| for it against its
+                    first parent (a root commit against the empty tree),
+                    under the file's name at the time
+        gw          on a revision: review it against the working tree
+        t           pin the file shown, or unpin and follow the buffer again
+                    (<CR> on the header row does the same)
+
+    `:GitVim timeline [{path}]` pins {path}, or shows the current file
+    when no path is given, and opens the Git tab on it.
 
 ==============================================================================
 7. REVIEW VIEW                                                 *gitvim-review*

@@ -2,6 +2,7 @@
 ---
 --- Every call goes through `run()`, which is asynchronous and invokes its
 --- callback on the main loop, so callers may touch the editor API directly.
+--- Output read a page at a time goes through `stream()` instead.
 --- Non-zero exits become a structured `gitvim.git.Error` rather than a string,
 --- so the UI can branch on `err.kind` instead of matching stderr itself.
 
@@ -207,6 +208,139 @@ function M.run(args, opts, cb)
       cwd = opts.cwd,
     }, nil)
   end
+end
+
+---@class gitvim.git.Stream
+---@field pause fun()   stop reading stdout; git blocks once the pipe fills
+---@field resume fun()
+---@field kill fun()    end git and drop every callback still to come
+
+--- Run git and hand its stdout over as it arrives, for output too long to
+--- wait for. Reading can be paused, and a paused git costs nothing: it
+--- blocks on the full pipe until reading resumes. There is no timeout, so the
+--- caller owns the process and must `kill` it once done with it.
+---
+--- Both callbacks run on the main loop, in order: every chunk, then `on_exit`
+--- once git has exited and its output is drained.
+---@param args string[]  git arguments, without the leading "git"
+---@param opts? { cwd?: string }
+---@param on_stdout fun(chunk: string)
+---@param on_exit fun(err?: gitvim.git.Error)
+---@return gitvim.git.Stream
+function M.stream(args, opts, on_stdout, on_exit)
+  opts = opts or {}
+  local uv = vim.uv
+  local cmd = command(args)
+  local stdout, stderr = uv.new_pipe(false), uv.new_pipe(false)
+  local errs = {}
+  local killed, exited, reading = false, false, false
+  local open = 2 -- pipes not yet at EOF
+  local code, signal = 0, 0
+  local handle, spawn_err
+
+  local function finish()
+    if exited and open == 0 then
+      vim.schedule(function()
+        if killed then
+          return
+        end
+        killed = true
+        local res = { stdout = "", stderr = table.concat(errs), code = code, signal = signal }
+        on_exit(code ~= 0 and build_error(args, opts, res) or nil)
+      end)
+    end
+  end
+
+  ---@param pipe uv.uv_pipe_t
+  ---@param on_data fun(data: string)
+  local function reader(pipe, on_data)
+    return function(err, data)
+      if data then
+        on_data(data)
+        return
+      end
+      -- EOF, or a read error, which ends the output all the same.
+      local _ = err
+      if not pipe:is_closing() then
+        pipe:close()
+      end
+      open = open - 1
+      finish()
+    end
+  end
+
+  local read_stdout = reader(stdout, function(data)
+    vim.schedule(function()
+      if not killed then
+        on_stdout(data)
+      end
+    end)
+  end)
+
+  handle, spawn_err = uv.spawn(cmd[1], {
+    args = vim.list_slice(cmd, 2),
+    cwd = opts.cwd,
+    stdio = { nil, stdout, stderr },
+    hide = true,
+  }, function(c, s)
+    code, signal = c, s
+    exited = true
+    handle:close()
+    finish()
+  end)
+
+  local stream = {}
+  function stream.pause()
+    if reading and not stdout:is_closing() then
+      stdout:read_stop()
+      reading = false
+    end
+  end
+  function stream.resume()
+    if not reading and not stdout:is_closing() then
+      stdout:read_start(read_stdout)
+      reading = true
+    end
+  end
+  function stream.kill()
+    if killed then
+      return
+    end
+    killed = true
+    if not exited and handle and not handle:is_closing() then
+      handle:kill("sigterm")
+    end
+    for _, pipe in ipairs({ stdout, stderr }) do
+      if not pipe:is_closing() then
+        pipe:close()
+      end
+    end
+  end
+
+  if not handle then
+    for _, pipe in ipairs({ stdout, stderr }) do
+      pipe:close()
+    end
+    killed = true
+    vim.schedule(function()
+      on_exit({
+        kind = "spawn",
+        message = tostring(spawn_err),
+        code = -1,
+        signal = 0,
+        stderr = tostring(spawn_err),
+        args = args,
+        cwd = opts.cwd,
+      })
+    end)
+    return stream
+  end
+
+  stderr:read_start(reader(stderr, function(data)
+    errs[#errs + 1] = data
+  end))
+  stream.resume()
+  return stream
 end
 
 --- Blocking variant. Tests and `:checkhealth` only.

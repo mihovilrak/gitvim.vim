@@ -44,6 +44,7 @@ local KIND = {
   C = "copied",
   T = "typechange",
 }
+M.KIND = KIND
 
 local REF_HL = {
   head = "GitVimRefHead",
@@ -78,7 +79,7 @@ end
 --- and how it stands against its upstream. Any change means a reload.
 ---@param store gitvim.Store
 ---@return string
-local function signature(store)
+function M.signature(store)
   local b = store.status and store.status.branch or {}
   return table.concat(
     { b.oid or "", b.head or "", b.upstream or "", b.ahead or 0, b.behind or 0 },
@@ -109,7 +110,7 @@ function M.reload(store)
   graph.generation = graph.generation + 1
   local generation = graph.generation
   graph.loading = true
-  graph.signature = signature(store)
+  graph.signature = M.signature(store)
   store:clear_dirty("graph")
 
   local max = math.max(config.options.graph.page_size, #graph.commits)
@@ -174,7 +175,7 @@ local function ensure(store)
     return
   end
   local graph = graph_of(store)
-  if store:is_dirty("graph") or graph.signature ~= signature(store) then
+  if store:is_dirty("graph") or graph.signature ~= M.signature(store) then
     M.reload(store)
   elseif not graph.loaded and not graph.loading and not graph.failed then
     M.reload(store)
@@ -366,6 +367,8 @@ local function commit_row(ctx, commit, layout)
   row.data = { type = "graph_commit", commit = commit }
   return row
 end
+--- Shared with TIMELINE, which draws its revisions the same way.
+M.commit_row = commit_row
 
 --- The lanes running past an expanded commit, padded to its node row's
 --- width so the files line up under the subject.
@@ -379,6 +382,7 @@ local function under(layout)
   row[#row + 1] = { text = (" "):rep(math.max(pad, 1) + 2) }
   return row
 end
+M.under = under
 
 ---@param commit gitvim.log.Commit
 ---@param layout gitvim.lane.Row

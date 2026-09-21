@@ -124,6 +124,21 @@ function M.editor_window()
   return editor_window()
 end
 
+--- The buffer in the editor window, without creating one: nil when the
+--- sidebar is the only window there is.
+---@return integer?
+function M.editor_buf()
+  local win = sb.editor_win
+  local side = sb.win and sb.win.win
+  if not (win and vim.api.nvim_win_is_valid(win) and win ~= side) then
+    win = vim.api.nvim_get_current_win()
+    if win == side or vim.api.nvim_win_get_config(win).relative ~= "" then
+      return nil
+    end
+  end
+  return vim.api.nvim_win_get_buf(win)
+end
+
 --- Show a file in the editor window.
 ---@param path string
 function M.open_file(path)
@@ -160,6 +175,7 @@ local GLOBAL_ACTIONS = {
     -- alone would miss (a new tag, a fetched remote branch).
     if c.store then
       c.store:mark_dirty("graph")
+      c.store:mark_dirty("timeline")
     end
     require("gitvim").refresh(function(err)
       if err then
@@ -207,7 +223,8 @@ end
 
 --- Rows that page more content in (`row.reach`) fire when they come within a
 --- screenful of the view, so scrolling towards the end of the graph loads
---- the next page before it is reached.
+--- the next page before it is reached. The GRAPH and TIMELINE may both have
+--- one in view; each distinct action fires once.
 local function reach()
   if sb.reaching or not M.is_open() or not sb.renderer then
     return
@@ -217,15 +234,19 @@ local function reach()
     return
   end
   local last = math.min(info.botline + info.height, vim.api.nvim_buf_line_count(sb.win.buf))
+  local found, seen = {}, {}
   for lnum = info.topline, last do
     local row = sb.renderer:at(lnum)
-    if row and row.reach then
-      sb.reaching = true
-      dispatch(row.reach, row.arg, row)
-      sb.reaching = false
-      return
+    if row and row.reach and not seen[row.reach] then
+      seen[row.reach] = true
+      found[#found + 1] = row
     end
   end
+  sb.reaching = true
+  for _, row in ipairs(found) do
+    dispatch(row.reach, row.arg, row)
+  end
+  sb.reaching = false
 end
 
 --- The row under the cursor, or nil when the sidebar is not focused.
@@ -485,7 +506,7 @@ local function wire()
       if vim.bo[args.buf].buflisted then
         require("gitvim.ui.tabs.buffers").touch(args.buf)
       end
-      if M.is_open() and (sb.tab == "buffers" or sb.tab == "files") then
+      if M.is_open() and (sb.tab == "buffers" or sb.tab == "files" or sb.tab == "git") then
         vim.schedule(M.redraw)
       end
     end,
@@ -513,7 +534,7 @@ local function wire()
     end,
   })
 
-  for _, event in ipairs({ "status", "head", "graph" }) do
+  for _, event in ipairs({ "status", "head", "graph", "timeline" }) do
     state.subscribe(event, function()
       if M.is_open() then
         vim.schedule(M.redraw)

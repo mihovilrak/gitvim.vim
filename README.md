@@ -1,8 +1,8 @@
 # gitvim.nvim
 
 > **Status: pre-alpha, under active development.** The sidebar shell, the Source
-> Control view with its Git actions, the in-buffer layer, the review view and the
-> commit graph are in place; the timeline view is being built. See
+> Control view with its Git actions, the in-buffer layer, the review view, the
+> commit graph and the file timeline are in place; search is being built. See
 > [Plan.md](Plan.md) for the full design and the task checklist.
 
 A VS Code-shaped Git workbench for Neovim, built for LazyVim.

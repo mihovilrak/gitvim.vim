@@ -77,6 +77,15 @@ local subcommands = {
       require("gitvim").open_blame_commit()
     end,
   },
+  timeline = {
+    desc = "show a file's history, pinned to [path] or following the current file",
+    run = function(args)
+      require("gitvim.ui.sections.timeline").open(args[1])
+    end,
+    complete = function(lead)
+      return vim.fn.getcompletion(lead, "file")
+    end,
+  },
   status = {
     desc = "echo a one-line summary of the current repository",
     run = function()

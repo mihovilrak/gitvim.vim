@@ -2,15 +2,16 @@
 ---
 --- `SOURCE CONTROL`, `GRAPH` and `TIMELINE` are collapsible sections of one
 --- scrollable panel, the way VS Code stacks its Source Control views, rather
---- than a second row of tabs nested inside the first (Plan.md D2). Phases 3
---- through 8 fill the section bodies in; this file owns the chrome around
---- them: the branch header, the chevrons and the collapse state.
+--- than a second row of tabs nested inside the first (Plan.md D2). The section
+--- bodies live in `ui/sections/`; this file owns the chrome around them: the
+--- branch header, the chevrons and the collapse state.
 
 local config = require("gitvim.config")
 local graph = require("gitvim.ui.sections.graph")
 local icons = require("gitvim.ui.icons")
 local scm = require("gitvim.ui.sections.scm")
 local tabs = require("gitvim.ui.tabs")
+local timeline = require("gitvim.ui.sections.timeline")
 
 local M = {
   name = "git",
@@ -71,15 +72,12 @@ local function branch_row(repo)
   return row
 end
 
---- Section bodies. Each returns the rows *under* its header; phases 3-8
---- replace these one at a time, and the chrome above never changes.
+--- Section bodies. Each returns the rows *under* its header.
 ---@type table<string, fun(ctx: gitvim.ui.TabCtx): gitvim.render.Row[]>
 local BODIES = {
   scm = scm.rows,
   graph = graph.rows,
-  timeline = function()
-    return { tabs.hint("No file history yet.", 2) }
-  end,
+  timeline = timeline.rows,
 }
 
 ---@param ctx gitvim.ui.TabCtx
@@ -130,6 +128,10 @@ M.actions = {
   graph_toggle = graph.actions.graph_toggle,
   graph_open = graph.actions.graph_open,
   graph_more = graph.actions.graph_more,
+  timeline_open = timeline.actions.timeline_open,
+  timeline_worktree = timeline.actions.timeline_worktree,
+  timeline_pin = timeline.actions.timeline_pin,
+  timeline_more = timeline.actions.timeline_more,
 
   stage_all = function()
     require("gitvim.actions").stage_all()
@@ -174,7 +176,9 @@ M.actions = {
 
 --- Section headers fold like folds do, so `za` on one is muscle memory.
 --- The rest are single keys, since tab keys are mapped `nowait`: `s`/`u`/`x`
---- act on the file or group under the cursor, capitals on everything.
+--- act on the file or group under the cursor, capitals on everything. On a
+--- TIMELINE revision `gw` reviews it against the working tree, and `t` pins
+--- the TIMELINE to its file or lets it follow the buffer again.
 M.keys = {
   ["za"] = "toggle_current",
   ["<Space>"] = "toggle_current",
@@ -192,6 +196,8 @@ M.keys = {
   ["p"] = "pull",
   ["P"] = "push",
   ["o"] = "open_file",
+  ["gw"] = "timeline_worktree",
+  ["t"] = "timeline_pin",
 }
 
 return M
