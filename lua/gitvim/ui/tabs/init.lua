@@ -100,7 +100,7 @@ end
 --- one, so the message never drifts between panels.
 ---@return gitvim.render.Row[]
 function M.no_repo()
-  return { M.blank(), M.hint("Not inside a git repository.") }
+  return { M.blank(), M.hint("Not a git repository.") }
 end
 
 return M

@@ -147,6 +147,7 @@ describe("state fed by a real refresh", function()
 
     assert.is_nil(err)
     assert.equals(fix.root, store.root)
+    assert.equals(fix.root, repo_mod.active().root)
     assert.is_false(store:is_dirty("status"))
     assert.is_false(store:is_dirty("head"))
 

@@ -117,7 +117,7 @@ describe("tabs chrome", function()
   end)
 
   it("says the same thing in every tab when there is no repository", function()
-    assert.is_true(has(tabs.no_repo(), "Not inside a git repository"))
+    assert.is_true(has(tabs.no_repo(), "Not a git repository"))
   end)
 end)
 
@@ -220,7 +220,7 @@ describe("Files tab", function()
   end)
 
   it("says so, rather than drawing a tree, outside a repository", function()
-    assert.is_true(has(files.rows({ width = 40, focused = false }), "Not inside a git repository"))
+    assert.is_true(has(files.rows({ width = 40, focused = false }), "Not a git repository"))
   end)
 end)
 
@@ -385,7 +385,7 @@ describe("Git tab", function()
   it("starts with the configured sections folded", function()
     local rows = git.rows(ctx)
     -- scm is open by default, graph and timeline are not.
-    assert.is_true(has(rows, "No working tree status yet"))
+    assert.is_true(has(rows, "Loading status"))
     assert.is_false(has(rows, "No commits loaded yet"))
   end)
 
@@ -419,11 +419,12 @@ describe("Git tab", function()
     local row = git.rows(ctx)[1]
     assert.is_truthy(text(row):match("2"))
     assert.is_truthy(text(row):match("1"))
-    assert.equals("push", row[5].action)
+    assert.equals("pull", row[5].action)
+    assert.equals("push", row[7].action)
   end)
 
   it("says so, rather than drawing chrome, outside a repository", function()
-    assert.is_true(has(git.rows({ width = 40, focused = false }), "Not inside a git repository"))
+    assert.is_true(has(git.rows({ width = 40, focused = false }), "Not a git repository"))
   end)
 end)
 

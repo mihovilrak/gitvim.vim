@@ -177,7 +177,7 @@ refresh~
 icons~
     enabled         boolean
     status          table     letters per status: modified "M", added "A",
-                              deleted "D", renamed "R", copied "C",
+                              deleted "D", renamed "R", copied "C", typechange "T",
                               untracked "U", ignored "I", conflict "!"
 
 keymaps~
@@ -214,10 +214,11 @@ BUFFERS                                                       *gitvim-buffers*
     modified ones carry a dot, and <CR> shows a buffer in the editor window.
 
 SOURCE CONTROL                                                    *gitvim-scm*
-    (planned) Collapsible groups with counts: Merge changes, Staged, Changes,
+    Collapsible groups with counts: Merge Changes, Staged, Changes and
     Untracked. Each row carries a status letter, a filetype icon and VS Code
-    colouring. The header shows the branch and ahead/behind counters. Actions:
-    stage, unstage, discard, commit, fetch, pull, push.
+    colouring; renames show both paths. The header shows the repository,
+    branch and ahead/behind counters. Group state is remembered per repository.
+    Stage, unstage, discard, commit, fetch, pull and push are planned.
 
 GRAPH                                                           *gitvim-graph*
     (planned) `git log` rendered with per-branch coloured lanes. Selecting a

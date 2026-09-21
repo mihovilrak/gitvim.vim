@@ -156,6 +156,7 @@ local defaults = {
       deleted = "D",
       renamed = "R",
       copied = "C",
+      typechange = "T",
       untracked = "U",
       ignored = "I",
       conflict = "!",

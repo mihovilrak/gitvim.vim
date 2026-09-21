@@ -1,7 +1,7 @@
 # gitvim.nvim
 
-> **Status: pre-alpha, under active development.** The scaffolding, the test harness
-> and the sidebar shell are in place; the Git features below are being built. See
+> **Status: pre-alpha, under active development.** The sidebar shell and read-only
+> Source Control view are in place; Git actions and the other views are being built. See
 > [Plan.md](Plan.md) for the full design and the task checklist.
 
 A VS Code-shaped Git workbench for Neovim, built for LazyVim.

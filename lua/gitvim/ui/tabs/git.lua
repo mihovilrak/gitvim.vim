@@ -8,6 +8,7 @@
 
 local config = require("gitvim.config")
 local icons = require("gitvim.ui.icons")
+local scm = require("gitvim.ui.sections.scm")
 local tabs = require("gitvim.ui.tabs")
 
 local M = {
@@ -49,20 +50,20 @@ local function branch_row(repo)
     { text = repo:head_label(), hl = "GitVimBranch", action = "checkout" },
   }
 
-  if (repo.ahead or 0) > 0 then
-    row[#row + 1] = { text = " " }
-    row[#row + 1] = {
-      text = icons.get("ahead") .. tostring(repo.ahead),
-      hl = "GitVimAhead",
-      action = "push",
-    }
-  end
   if (repo.behind or 0) > 0 then
     row[#row + 1] = { text = " " }
     row[#row + 1] = {
       text = icons.get("behind") .. tostring(repo.behind),
       hl = "GitVimBehind",
       action = "pull",
+    }
+  end
+  if (repo.ahead or 0) > 0 then
+    row[#row + 1] = { text = " " }
+    row[#row + 1] = {
+      text = icons.get("ahead") .. tostring(repo.ahead),
+      hl = "GitVimAhead",
+      action = "push",
     }
   end
 
@@ -73,9 +74,7 @@ end
 --- replace these one at a time, and the chrome above never changes.
 ---@type table<string, fun(ctx: gitvim.ui.TabCtx): gitvim.render.Row[]>
 local BODIES = {
-  scm = function()
-    return { tabs.hint("No working tree status yet.", 2) }
-  end,
+  scm = scm.rows,
   graph = function()
     return { tabs.hint("No commits loaded yet.", 2) }
   end,
@@ -120,12 +119,26 @@ M.actions = {
     local key = "section:" .. section
     ctx.store.collapsed[key] = not collapsed(ctx.store, section)
   end,
+
+  toggle_group = scm.actions.toggle_group,
+
+  --- Toggle whichever kind of collapsible header is under the cursor.
+  ---@param ctx gitvim.ui.TabCtx
+  ---@param arg string
+  ---@param row gitvim.render.Row
+  toggle_current = function(ctx, arg, row)
+    if row and row.action == "toggle_section" then
+      M.actions.toggle_section(ctx, arg)
+    elseif row and row.action == "toggle_group" then
+      M.actions.toggle_group(ctx, arg)
+    end
+  end,
 }
 
 --- Section headers fold like folds do, so `za` on one is muscle memory.
 M.keys = {
-  ["za"] = "toggle_section",
-  ["<Space>"] = "toggle_section",
+  ["za"] = "toggle_current",
+  ["<Space>"] = "toggle_current",
 }
 
 return M

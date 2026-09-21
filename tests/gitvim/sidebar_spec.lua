@@ -180,6 +180,54 @@ describe("sidebar.open", function()
   end)
 end)
 
+describe("public open", function()
+  local fix
+
+  before_each(function()
+    config.setup({ icons = { style = "ascii" } })
+    state.reset()
+    repo_mod.reset()
+    vim.cmd("silent! only")
+    fix = fixture.build()
+    vim.cmd.edit(vim.fn.fnameescape(fix.root .. "/modified.lua"))
+  end)
+
+  after_each(function()
+    sidebar.close()
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.startswith(vim.api.nvim_buf_get_name(buf), fix.root) then
+        pcall(vim.api.nvim_buf_delete, buf, { force = true })
+      end
+    end
+    sidebar.reset()
+    fix:destroy()
+    state.reset()
+    repo_mod.reset()
+    config.setup({})
+  end)
+
+  it("discovers the current repository and populates SOURCE CONTROL", function()
+    require("gitvim").open("git")
+    local loaded = vim.wait(10000, function()
+      local active = repo_mod.active()
+      return active and state.get(active.root).status ~= nil
+    end, 10)
+
+    assert.is_true(loaded, "status should load after the sidebar opens")
+    assert.equals(fix.root, repo_mod.active().root)
+    assert.is_number(line_matching("Staged"))
+    assert.is_number(line_matching("Changes"))
+    assert.is_number(line_matching("Untracked"))
+    assert.is_number(line_matching("modified%.lua"))
+
+    local changes = line_matching("Changes")
+    vim.api.nvim_win_set_cursor(sidebar_win(), { changes, 0 })
+    press("<Space>")
+    assert.is_nil(line_matching("modified%.lua"), "the group should collapse from the keyboard")
+    assert.is_true(state.get(fix.root).collapsed.changes)
+  end)
+end)
+
 describe("sidebar winbar", function()
   before_each(function()
     config.setup({})

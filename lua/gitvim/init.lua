@@ -7,6 +7,29 @@ local M = {}
 M.version = "0.0.0-dev"
 
 local did_setup = false
+local detecting = false
+
+--- Load status on the first open. The sidebar draws its empty/loading state
+--- immediately; the status event redraws it when git finishes.
+---@param path string
+local function discover(path)
+  if require("gitvim.git.repo").active() or detecting then
+    return
+  end
+  detecting = true
+  M.refresh(path, function(err)
+    detecting = false
+    if err and err.kind ~= "not_a_repo" then
+      vim.notify(require("gitvim.git.cli").format_error(err), vim.log.levels.ERROR)
+    end
+  end)
+end
+
+---@return string
+local function current_path()
+  local path = vim.api.nvim_buf_get_name(0)
+  return path ~= "" and path or (vim.uv.cwd() or ".")
+end
 
 ---@param opts? gitvim.Config
 function M.setup(opts)
@@ -18,13 +41,15 @@ function M.setup(opts)
   require("gitvim.config").setup(opts)
   require("gitvim.commands").setup()
   require("gitvim.ui.hl").setup()
-  -- Phase 3 onwards: buffer.signs.setup(), the refresh watcher.
+  -- Later phases install the refresh watcher and buffer integrations.
 end
 
 --- Open (and focus) the sidebar.
 ---@param tab? gitvim.Tab
 function M.open(tab)
+  local path = current_path()
   require("gitvim.ui.sidebar").open(tab)
+  discover(path)
 end
 
 --- Close the sidebar.
@@ -35,7 +60,12 @@ end
 --- Toggle the sidebar.
 ---@param tab? gitvim.Tab
 function M.toggle(tab)
-  require("gitvim.ui.sidebar").toggle(tab)
+  local path = current_path()
+  local sidebar = require("gitvim.ui.sidebar")
+  sidebar.toggle(tab)
+  if sidebar.is_open() then
+    discover(path)
+  end
 end
 
 --- Detect the repository for `path` and re-read its status into the store.
@@ -55,6 +85,7 @@ function M.refresh(path, cb)
       cb(err)
       return
     end
+    require("gitvim.git.repo").set_active(repo.root)
     local store = require("gitvim.state").get(repo.root)
     require("gitvim.git.status").get(repo.root, nil, function(serr, result)
       if serr then
