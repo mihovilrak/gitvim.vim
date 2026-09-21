@@ -19,6 +19,27 @@ describe("commands.complete", function()
     assert.same({ "search" }, commands.complete("se", "GitVim open se"))
   end)
 
+  it("completes the commit flags not yet given", function()
+    assert.same({ "--amend", "--signoff" }, commands.complete("", "GitVim commit "))
+    assert.same({ "--signoff" }, commands.complete("", "GitVim commit --amend "))
+    assert.same({ "--amend" }, commands.complete("--a", "GitVim commit --a"))
+  end)
+
+  it("lists the Source Control subcommands", function()
+    local names = commands.complete("", "GitVim ")
+    for _, name in ipairs({
+      "stage",
+      "unstage",
+      "discard",
+      "stage-all",
+      "commit",
+      "push",
+      "checkout",
+    }) do
+      assert.is_true(vim.tbl_contains(names, name), name)
+    end
+  end)
+
   it("offers nothing after a subcommand that takes no arguments", function()
     assert.same({}, commands.complete("", "GitVim close "))
   end)
@@ -41,6 +62,19 @@ describe("commands.dispatch", function()
     assert.equals(vim.log.levels.ERROR, messages[1].level)
     assert.is_truthy(messages[1].msg:match("unknown subcommand 'frobnicate'"))
     assert.is_truthy(messages[1].msg:match("toggle"))
+  end)
+
+  it("rejects an unknown commit flag", function()
+    local notify, messages = vim.notify, {}
+    vim.notify = function(msg, level)
+      table.insert(messages, { msg = msg, level = level })
+    end
+    commands.dispatch({ fargs = { "commit", "--no-verify" } })
+    vim.notify = notify
+
+    assert.equals(1, #messages)
+    assert.equals(vim.log.levels.ERROR, messages[1].level)
+    assert.is_truthy(messages[1].msg:match("unknown commit flag '%-%-no%-verify'"))
   end)
 
   it("does not mutate the command table it is handed", function()

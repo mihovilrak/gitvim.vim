@@ -124,6 +124,37 @@ M.actions = {
   end,
 
   toggle_group = scm.actions.toggle_group,
+  open = scm.actions.open,
+  stage = scm.actions.stage,
+  unstage = scm.actions.unstage,
+  discard = scm.actions.discard,
+  toggle_stage = scm.actions.toggle_stage,
+  commit = scm.actions.commit,
+
+  stage_all = function()
+    require("gitvim.actions").stage_all()
+  end,
+  unstage_all = function()
+    require("gitvim.actions").unstage_all()
+  end,
+  discard_all = function()
+    require("gitvim.actions").discard_all()
+  end,
+  amend = function()
+    require("gitvim.actions").commit({ amend = true })
+  end,
+  checkout = function()
+    require("gitvim.actions").checkout()
+  end,
+  fetch = function()
+    require("gitvim.actions").fetch()
+  end,
+  pull = function()
+    require("gitvim.actions").pull()
+  end,
+  push = function()
+    require("gitvim.actions").push()
+  end,
 
   --- Toggle whichever kind of collapsible header is under the cursor.
   ---@param ctx gitvim.ui.TabCtx
@@ -139,9 +170,24 @@ M.actions = {
 }
 
 --- Section headers fold like folds do, so `za` on one is muscle memory.
+--- The rest are single keys, since tab keys are mapped `nowait`: `s`/`u`/`x`
+--- act on the file or group under the cursor, capitals on everything.
 M.keys = {
   ["za"] = "toggle_current",
   ["<Space>"] = "toggle_current",
+  ["s"] = "stage",
+  ["u"] = "unstage",
+  ["x"] = "discard",
+  ["-"] = "toggle_stage",
+  ["S"] = "stage_all",
+  ["U"] = "unstage_all",
+  ["X"] = "discard_all",
+  ["c"] = "commit",
+  ["C"] = "amend",
+  ["b"] = "checkout",
+  ["f"] = "fetch",
+  ["p"] = "pull",
+  ["P"] = "push",
 }
 
 return M

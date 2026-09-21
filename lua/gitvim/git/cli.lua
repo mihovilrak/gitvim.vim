@@ -33,6 +33,9 @@ local DEFAULT_TIMEOUT = 30000
 ---| "conflict"     # the operation needs a clean merge state
 ---| "killed"       # timed out or signalled
 ---| "spawn"        # git could not be executed at all
+---| "empty_message" # a commit was asked for with nothing to say
+---| "no_remote"    # a push needs a remote and there is none
+---| "detached"     # the operation needs a branch and HEAD is detached
 ---| "unknown"      # non-zero exit we have no pattern for
 
 ---@class gitvim.git.Error

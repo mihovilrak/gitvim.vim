@@ -151,6 +151,24 @@ describe("buffer.signs", function()
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 
+  it("never shadows a global mapping, even one made after its own", function()
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.keymap.set("n", "<leader>gs", "<Cmd>let g:kept = 1<CR>")
+    signs.map_buffer(buf)
+    assert.is_nil(map(buf, "<leader>gs"), "a global map is left in charge")
+    assert.is_table(map(buf, "<leader>gc"))
+
+    -- Defined later, like LazyVim's own maps on VeryLazy: the next pass yields.
+    vim.keymap.set("n", "<leader>gc", "<Cmd>let g:kept = 2<CR>")
+    signs.map_buffer(buf)
+    assert.is_nil(map(buf, "<leader>gc"))
+    assert.is_table(map(buf, "<leader>gP"), "unrelated maps stay")
+
+    vim.keymap.del("n", "<leader>gs")
+    vim.keymap.del("n", "<leader>gc")
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
   it("renders a real gitsigns sign and current-line blame in a fixture repo", function()
     local fixture = require("fixture").build()
     local gitsigns = require("gitsigns")

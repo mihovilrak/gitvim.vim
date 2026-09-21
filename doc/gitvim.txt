@@ -92,8 +92,29 @@ require("gitvim").toggle()
 :GitVim toggle          Toggle the sidebar.
 :GitVim blame           Toggle current-line blame.
 :GitVim blame-commit    Select the current line's commit in GRAPH.
+:GitVim stage           Stage the current file.
+:GitVim unstage         Unstage the current file.
+:GitVim discard         Discard the current file's working-tree changes
+                        (an untracked file is deleted).
+:GitVim stage-all       Stage every change, untracked files included.
+:GitVim unstage-all     Unstage everything.
+:GitVim discard-all     Discard every working-tree change and delete
+                        untracked files. Staged changes are kept.
+:GitVim commit [--amend] [--signoff]
+                        Open the commit message editor, see
+                        |gitvim-commit|.
+:GitVim fetch           Fetch from the remotes.
+:GitVim pull            Pull the current branch.
+:GitVim push            Push the current branch. A branch without an
+                        upstream is published with `--set-upstream`.
+:GitVim checkout        Pick another local branch and switch to it.
+:GitVim refresh         Re-read git status for the current repository.
+:GitVim status          Echo a one-line summary of the repository.
+:GitVim health          Run |:checkhealth| gitvim.
 
-Subcommands complete with <Tab>.
+Subcommands and the commit flags complete with <Tab>. Every discard asks
+for confirmation first unless `scm.confirm_discard` is false. Remote
+operations report their progress with |vim.notify()|.
 
 ==============================================================================
 5. CONFIGURATION                                               *gitvim-config*
@@ -143,8 +164,12 @@ scm~
     groups          string[]  default { "merge", "staged", "changes",
                               "untracked" }
     collapsed       string[]  groups collapsed on first open
-    confirm_discard boolean   default true
-    row_actions     boolean   show [+] [-] [<] on the focused row
+    confirm_discard boolean   default true, ask before any discard
+    row_actions     boolean   default true, show the stage / unstage /
+                              discard buttons on file rows and group
+                              headers
+    signoff         boolean   default false, add a Signed-off-by trailer
+                              to every commit
 
 graph~
     page_size       number    default 256, more load on scroll
@@ -220,7 +245,41 @@ SOURCE CONTROL                                                    *gitvim-scm*
     Untracked. Each row carries a status letter, a filetype icon and VS Code
     colouring; renames show both paths. The header shows the repository,
     branch and ahead/behind counters. Group state is remembered per repository.
-    Stage, unstage, discard, commit, fetch, pull and push are planned.
+
+    The first row is the commit line: the draft's subject (or "Message")
+    and a Commit button, which reads "Commit (nothing staged)" when the
+    index is clean. File rows and group headers carry right-aligned
+    buttons -- `[+]` stage, `[−]` unstage, `[↩]` discard (`[+]` `[-]` `[<]`
+    with ASCII icons) -- showing only the ones that apply. Click a button,
+    or use the keys:
+
+        <CR>        open the file; fold a group or section on a header
+        s           stage the row (on a header: the whole group)
+        u           unstage the row
+        x           discard the row, after confirmation
+        -           toggle between staged and unstaged
+        S  U  X     stage / unstage / discard everything
+        za <Space>  fold a group or section
+        c           commit, see |gitvim-commit|
+        C           amend HEAD
+        b           check out another branch
+        f  p  P     fetch / pull / push
+
+    The sidebar refreshes itself on |BufWritePost| and |FocusGained|, and
+    after git commands run outside Neovim: the git directory is watched and
+    changes are debounced by `refresh.debounce`. While the sidebar is
+    hidden a change only marks the status stale; it is re-read on the next
+    open.
+
+COMMIT EDITOR                                                  *gitvim-commit*
+    A floating `gitcommit` buffer for a multi-line message. <C-Enter> (or
+    <C-s>, for terminals that cannot send <C-Enter>) commits, `q` and <Esc>
+    close it. The message is passed to `git commit -F -` on stdin, so quotes
+    and shell characters arrive untouched; lines starting with `#` are
+    dropped. What you type is kept as the repository's draft, so closing the
+    editor loses nothing, and a successful commit clears it. An amend is
+    prefilled with HEAD's message and leaves the draft alone. `--signoff`,
+    or `scm.signoff`, adds a Signed-off-by trailer.
 
 GRAPH                                                           *gitvim-graph*
     (planned) `git log` rendered with per-branch coloured lanes. Selecting a
@@ -255,7 +314,16 @@ Default mappings (under `keymaps.prefix`, `<leader>g` by default):
     hb    show line blame            tb    toggle current-line blame
     hB    select blamed commit in GRAPH
 
-Existing buffer-local mappings are never replaced. The public Lua helpers
+    s     stage the file             u     unstage the file
+    x     discard the file           S     stage all changes
+    c     commit                     C     amend HEAD
+    f     fetch                      p     pull
+    P     push
+
+A mapping is only made where the key is free: gitvim never replaces or
+shadows an existing mapping, global or buffer-local. If a global mapping on
+the same key is defined later (LazyVim's `<leader>gs`, `<leader>gc`, ... on
+VeryLazy), gitvim's map is removed and yours wins. The public Lua helpers
 `require("gitvim").toggle_blame()` and
 `require("gitvim").open_blame_commit()` provide the same blame actions.
 

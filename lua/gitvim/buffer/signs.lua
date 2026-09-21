@@ -184,18 +184,31 @@ local function mappable(buf)
   return vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == ""
 end
 
----@param buf integer
 ---@param lhs string
----@param fn function
----@param desc string
-local function map_if_free(buf, lhs, fn, desc)
-  local want = vim.api.nvim_replace_termcodes(lhs, true, true, true)
-  for _, existing in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
-    if vim.api.nvim_replace_termcodes(existing.lhs, true, true, true) == want then
-      return
+---@return string
+local function keycode(lhs)
+  return vim.api.nvim_replace_termcodes(lhs, true, true, true)
+end
+
+--- Keys already taken for `buf`, other than by gitvim itself: every global
+--- normal-mode mapping, plus the buffer's own. A buffer-local map would
+--- shadow a global one, so both count as taken.
+---@param buf integer
+---@return table<string, true> taken
+---@return table<string, string> ours  keycode -> lhs of gitvim's own maps
+local function mapped_keys(buf)
+  local taken, ours = {}, {}
+  for _, map in ipairs(vim.api.nvim_get_keymap("n")) do
+    taken[keycode(map.lhs)] = true
+  end
+  for _, map in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
+    if vim.startswith(map.desc or "", "gitvim: ") then
+      ours[keycode(map.lhs)] = map.lhs
+    else
+      taken[keycode(map.lhs)] = true
     end
   end
-  vim.keymap.set("n", lhs, fn, { buffer = buf, silent = true, desc = desc })
+  return taken, ours
 end
 
 ---@param buf integer
@@ -203,16 +216,61 @@ function M.map_buffer(buf)
   if not config.options.keymaps.enabled or not mappable(buf) then
     return
   end
+  local taken, ours = mapped_keys(buf)
+
+  --- Map `lhs` unless the user (or another plugin) already did, globally or
+  --- for this buffer. A global mapping made after ours -- LazyVim defines
+  --- its own on VeryLazy, after the first file is read -- wins too: the next
+  --- pass removes the gitvim map that would shadow it.
+  ---@param lhs string
+  ---@param fn function
+  ---@param desc string
+  local function map_if_free(lhs, fn, desc)
+    local key = keycode(lhs)
+    if taken[key] then
+      if ours[key] then
+        vim.keymap.del("n", ours[key], { buffer = buf })
+      end
+    elseif not ours[key] then
+      vim.keymap.set("n", lhs, fn, { buffer = buf, silent = true, desc = desc })
+    end
+  end
+
   local prefix = config.options.keymaps.prefix
-  map_if_free(buf, prefix .. "hs", bridge.stage_hunk, "gitvim: stage hunk")
-  map_if_free(buf, prefix .. "hu", bridge.undo_stage_hunk, "gitvim: undo staged hunk")
-  map_if_free(buf, prefix .. "hr", reset_hunk, "gitvim: reset hunk")
-  map_if_free(buf, prefix .. "hp", bridge.preview_hunk_inline, "gitvim: preview hunk inline")
-  map_if_free(buf, prefix .. "hb", bridge.blame_line, "gitvim: blame line")
-  map_if_free(buf, prefix .. "tb", require("gitvim.buffer.blame").toggle, "gitvim: toggle blame")
-  map_if_free(buf, prefix .. "hB", function()
+  map_if_free(prefix .. "hs", bridge.stage_hunk, "gitvim: stage hunk")
+  map_if_free(prefix .. "hu", bridge.undo_stage_hunk, "gitvim: undo staged hunk")
+  map_if_free(prefix .. "hr", reset_hunk, "gitvim: reset hunk")
+  map_if_free(prefix .. "hp", bridge.preview_hunk_inline, "gitvim: preview hunk inline")
+  map_if_free(prefix .. "hb", bridge.blame_line, "gitvim: blame line")
+  map_if_free(prefix .. "tb", require("gitvim.buffer.blame").toggle, "gitvim: toggle blame")
+  map_if_free(prefix .. "hB", function()
     require("gitvim.buffer.blame").open_commit(buf)
   end, "gitvim: open blamed commit")
+
+  -- Source Control: the sidebar's row buttons, for the file being edited.
+  local actions = function(name, ...)
+    local args = { ... }
+    return function()
+      local mod = require("gitvim.actions")
+      mod.in_current_repo(function()
+        mod[name](unpack(args))
+      end)
+    end
+  end
+  local file = function(name)
+    return function()
+      require("gitvim.actions")[name]()
+    end
+  end
+  map_if_free(prefix .. "s", file("stage_file"), "gitvim: stage file")
+  map_if_free(prefix .. "u", file("unstage_file"), "gitvim: unstage file")
+  map_if_free(prefix .. "x", file("discard_file"), "gitvim: discard file changes")
+  map_if_free(prefix .. "S", actions("stage_all"), "gitvim: stage all")
+  map_if_free(prefix .. "c", actions("commit"), "gitvim: commit")
+  map_if_free(prefix .. "C", actions("commit", { amend = true }), "gitvim: amend commit")
+  map_if_free(prefix .. "f", actions("fetch"), "gitvim: fetch")
+  map_if_free(prefix .. "p", actions("pull"), "gitvim: pull")
+  map_if_free(prefix .. "P", actions("push"), "gitvim: push")
 end
 
 ---@param win integer
@@ -280,13 +338,29 @@ function M.setup()
       end
     end,
   })
+  -- Global mappings made late in startup (LazyVim's, on VeryLazy) take
+  -- precedence over gitvim's buffer maps: re-check the buffers mapped so far.
+  local function remap_all()
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      M.map_buffer(buf)
+    end
+  end
+  vim.api.nvim_create_autocmd("VimEnter", {
+    group = group,
+    desc = "gitvim: yield buffer maps to late global mappings",
+    callback = remap_all,
+  })
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "VeryLazy",
+    desc = "gitvim: yield buffer maps to late global mappings",
+    callback = remap_all,
+  })
 
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     M.apply_window(win)
   end
-  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-    M.map_buffer(buf)
-  end
+  remap_all()
 end
 
 --- Restore editor state. Intended for tests and live plugin development.

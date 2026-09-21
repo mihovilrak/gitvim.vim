@@ -231,4 +231,165 @@ describe("SOURCE CONTROL section", function()
 
     assert.is_table(find(scm.rows({ width = 40, focused = false }), "Not a git repository"))
   end)
+  ---@param row gitvim.render.Row
+  ---@return string[]
+  local function row_buttons(row)
+    local out = {}
+    for _, chunk in ipairs(row) do
+      if chunk.hl == "GitVimButton" or chunk.hl == "GitVimButtonActive" then
+        out[#out + 1] = chunk.action
+      end
+    end
+    return out
+  end
+
+  it("puts the commit line first, showing the draft's subject", function()
+    local row = scm.rows(ctx)[1]
+    assert.equals("scm_commit", row.data.type)
+    assert.equals("commit", row.action)
+    assert.is_truthy(text(row):match("Message"))
+    assert.equals("Commit", vim.trim(row[#row].text))
+    assert.equals("GitVimButtonActive", row[#row].hl)
+
+    store.draft = "feat: a subject\n\nand a body"
+    row = scm.rows(ctx)[1]
+    assert.equals("feat: a subject", row[2].text)
+    assert.is_nil(text(row):match("body"))
+
+    store.draft = ("x"):rep(200)
+    assert.equals(ctx.width - 1, vim.api.nvim_strwidth(text(scm.rows(ctx)[1])))
+  end)
+
+  it("says when there is nothing staged to commit", function()
+    fix:git({ "reset", "-q" })
+    local _, result = await(function(done)
+      require("gitvim.git.status").get(repo.root, nil, done)
+    end)
+    store:set_status(result)
+    local row = scm.rows(ctx)[1]
+    assert.equals("Commit (nothing staged)", vim.trim(row[#row].text))
+    assert.equals("GitVimButton", row[#row].hl)
+  end)
+
+  it("offers each group's buttons on its file rows, right-aligned", function()
+    local rows = scm.rows(ctx)
+    local cases = {
+      { "staged.lua", "staged", { "unstage" }, "[-]" },
+      { "modified.lua", "changes", { "discard", "stage" }, "[<] [+]" },
+      { "spaced ünicode.txt", "untracked", { "discard", "stage" }, "[<] [+]" },
+    }
+    for _, case in ipairs(cases) do
+      local row = entry_row(rows, case[1], case[2])
+      assert.same(case[3], row_buttons(row))
+      assert.is_truthy(vim.endswith(text(row), case[4]), case[1])
+      assert.equals(ctx.width - 1, vim.api.nvim_strwidth(text(row)), case[1])
+    end
+  end)
+
+  it("offers the group's buttons on its header, keeping the count last", function()
+    local header = group_header(scm.rows(ctx), "changes")
+    assert.same({ "discard", "stage" }, row_buttons(header))
+    assert.is_truthy(text(header):match("%[<%] %[%+%] %d+$"))
+    assert.equals("GitVimCount", header[#header].hl)
+  end)
+
+  it("hides the buttons when row_actions is off", function()
+    config.setup({ icons = { style = "ascii" }, scm = { row_actions = false } })
+    local rows = scm.rows(ctx)
+    assert.same({}, row_buttons(entry_row(rows, "modified.lua", "changes")))
+    local header = group_header(rows, "changes")
+    assert.equals(tostring(#store:groups().changes), header[#header].text)
+  end)
+
+  describe("actions", function()
+    local select
+
+    before_each(function()
+      repo_mod.set_active(repo.root)
+      select = vim.ui.select
+    end)
+
+    after_each(function()
+      vim.ui.select = select
+    end)
+
+    --- `git status` for one path, straight from git.
+    ---@param path string
+    ---@return string
+    local function xy(path)
+      return fix:git({ "status", "--porcelain", "--", path }):sub(1, 2)
+    end
+
+    ---@param pred fun(): boolean
+    local function eventually(pred)
+      assert.is_true(vim.wait(2000, pred, 10))
+    end
+
+    it("stages and unstages a file row, and the store follows", function()
+      scm.actions.stage(ctx, nil, entry_row(scm.rows(ctx), "modified.lua", "changes"))
+      eventually(function()
+        return helpers.entry(store.status, "modified.lua", "staged") ~= nil
+      end)
+      assert.equals("M ", xy("modified.lua"))
+
+      scm.actions.toggle_stage(ctx, nil, entry_row(scm.rows(ctx), "modified.lua", "staged"))
+      eventually(function()
+        return helpers.entry(store.status, "modified.lua", "changes") ~= nil
+      end)
+      assert.equals(" M", xy("modified.lua"))
+    end)
+
+    it("stages a whole group from its header", function()
+      scm.actions.stage(ctx, nil, group_header(scm.rows(ctx), "untracked"))
+      eventually(function()
+        return #store:groups().untracked == 0
+      end)
+      assert.equals("A ", xy("spaced ünicode.txt"))
+      assert.equals(" M", xy("modified.lua"), "other groups are left alone")
+    end)
+
+    it("ignores a button the row does not offer", function()
+      scm.actions.unstage(ctx, nil, entry_row(scm.rows(ctx), "modified.lua", "changes"))
+      scm.actions.discard(ctx, nil, entry_row(scm.rows(ctx), "staged.lua", "staged"))
+      scm.actions.stage(ctx, nil, scm.rows(ctx)[1])
+      vim.wait(200)
+      assert.equals(" M", xy("modified.lua"))
+      assert.equals("AM", xy("staged.lua"))
+    end)
+
+    it("asks before discarding and does nothing when cancelled", function()
+      local prompts = {}
+      vim.ui.select = function(items, opts, cb) ---@diagnostic disable-line: duplicate-set-field
+        prompts[#prompts + 1] = opts.prompt
+        cb(nil)
+      end
+      scm.actions.discard(ctx, nil, entry_row(scm.rows(ctx), "modified.lua", "changes"))
+      vim.wait(200)
+      assert.same({ "Discard changes to 'modified.lua'?" }, prompts)
+      assert.equals(" M", xy("modified.lua"))
+    end)
+
+    it("discards once confirmed", function()
+      vim.ui.select = function(items, _, cb) ---@diagnostic disable-line: duplicate-set-field
+        cb(items[1])
+      end
+      scm.actions.discard(ctx, nil, entry_row(scm.rows(ctx), "spaced ünicode.txt", "untracked"))
+      eventually(function()
+        return #store:groups().untracked == 0
+      end)
+      assert.equals(0, vim.fn.filereadable(fix.root .. "/spaced ünicode.txt"))
+    end)
+
+    it("skips the prompt when confirm_discard is off", function()
+      config.setup({ icons = { style = "ascii" }, scm = { confirm_discard = false } })
+      vim.ui.select = function() ---@diagnostic disable-line: duplicate-set-field
+        error("should not prompt")
+      end
+      scm.actions.discard(ctx, nil, entry_row(scm.rows(ctx), "modified.lua", "changes"))
+      eventually(function()
+        return helpers.entry(store.status, "modified.lua", "changes") == nil
+      end)
+      assert.equals("", xy("modified.lua"))
+    end)
+  end)
 end)

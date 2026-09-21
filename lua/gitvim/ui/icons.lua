@@ -27,6 +27,10 @@ local NERD = {
   -- Buffers tab: the cursor marker and the unsaved-changes dot.
   current = "▸",
   modified = "●",
+  -- SOURCE CONTROL row buttons.
+  stage = "[+]",
+  unstage = "[−]",
+  discard = "[↩]",
 }
 
 --- Text stand-ins, chosen to be the same display width or narrower.
@@ -45,6 +49,9 @@ local ASCII = {
   behind = "v",
   current = ">",
   modified = "+",
+  stage = "[+]",
+  unstage = "[-]",
+  discard = "[<]",
 }
 
 ---@return boolean

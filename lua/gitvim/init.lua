@@ -9,12 +9,21 @@ M.version = "0.0.0-dev"
 local did_setup = false
 local detecting = false
 
---- Load status on the first open. The sidebar draws its empty/loading state
---- immediately; the status event redraws it when git finishes.
+--- Load status on the first open, and again on any open after the watcher
+--- saw a change while the sidebar was hidden. The sidebar draws its
+--- empty/loading state immediately; the status event redraws it when git
+--- finishes.
 ---@param path string
 local function discover(path)
-  if require("gitvim.git.repo").active() or detecting then
+  if detecting then
     return
+  end
+  local active = require("gitvim.git.repo").active()
+  if active then
+    if not require("gitvim.state").get(active.root):is_dirty("status") then
+      return
+    end
+    path = active.root
   end
   detecting = true
   M.refresh(path, function(err)
@@ -49,7 +58,7 @@ function M.setup(opts)
     current_line_blame_formatter = buffer_opts.blame_format,
   })
   require("gitvim.buffer.signs").setup()
-  -- A later phase installs the repository refresh watcher.
+  require("gitvim.git.watcher").setup()
 end
 
 --- Toggle current-line blame annotations.

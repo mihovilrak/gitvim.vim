@@ -1,7 +1,8 @@
 # gitvim.nvim
 
-> **Status: pre-alpha, under active development.** The sidebar shell and read-only
-> Source Control view plus the in-buffer layer are in place; Git actions and the other views are being built. See
+> **Status: pre-alpha, under active development.** The sidebar shell, the Source
+> Control view with its Git actions, and the in-buffer layer are in place; the review,
+> graph and timeline views are being built. See
 > [Plan.md](Plan.md) for the full design and the task checklist.
 
 A VS Code-shaped Git workbench for Neovim, built for LazyVim.
@@ -81,8 +82,36 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 | `:GitVim toggle` | Toggle the sidebar |
 | `:GitVim blame` | Toggle current-line blame |
 | `:GitVim blame-commit` | Select the current line's commit in the Git graph |
+| `:GitVim stage` / `unstage` / `discard` | Stage, unstage or discard the current file |
+| `:GitVim stage-all` / `unstage-all` / `discard-all` | The same for every change |
+| `:GitVim commit [--amend] [--signoff]` | Open the commit message editor |
+| `:GitVim fetch` / `pull` / `push` | Remote operations; `push` publishes a branch that has no upstream |
+| `:GitVim checkout` | Switch to another local branch |
 
-`:GitVim` supports completion for its subcommands.
+`:GitVim` supports completion for its subcommands and the commit flags.
+Every discard asks for confirmation first (`scm.confirm_discard`).
+
+### Source Control
+
+The Git tab's SOURCE CONTROL section opens with a commit line (the draft's
+subject and a **Commit** button), then one group per porcelain state. File
+rows and group headers carry right-aligned buttons: `[+]` stage, `[−]` unstage,
+`[↩]` discard (`[+]` `[-]` `[<]` with ASCII icons). Click them, or use the keys:
+
+| Key | Does | Key | Does |
+|---|---|---|---|
+| `<CR>` | Open the file | `c` | Commit |
+| `s` | Stage the row (a header: the group) | `C` | Amend HEAD |
+| `u` | Unstage the row | `b` | Check out a branch |
+| `x` | Discard the row | `f` | Fetch |
+| `-` | Toggle staged | `p` | Pull |
+| `S` / `U` / `X` | Stage / unstage / discard all | `P` | Push |
+| `za` / `<Space>` | Fold a group or section | | |
+
+The commit editor is a floating `gitcommit` buffer: `<C-Enter>` (or `<C-s>`)
+commits, `q` / `<Esc>` closes. What you type is kept as the repository's
+draft, so closing it loses nothing. The sidebar refreshes itself after
+external `git` commands, on `BufWritePost` and on `FocusGained`.
 
 The default in-buffer mappings use `keymaps.prefix` (`<leader>g`):
 
@@ -95,9 +124,14 @@ The default in-buffer mappings use `keymaps.prefix` (`<leader>g`):
 | `<leader>ghb` | Show line blame |
 | `<leader>gtb` | Toggle current-line blame |
 | `<leader>ghB` | Select the blamed commit in GRAPH |
+| `<leader>gs` / `gu` / `gx` | Stage / unstage / discard the current file |
+| `<leader>gS` | Stage all changes |
+| `<leader>gc` / `gC` | Commit / amend |
+| `<leader>gf` / `gp` / `gP` | Fetch / pull / push |
 
 Double-click a gitsign to preview its hunk inline, or right-click it for the
-hunk action menu. Existing buffer-local mappings and custom status columns are preserved.
+hunk action menu. A mapping is only made where the key is free, so gitvim never shadows your own
+or LazyVim's `<leader>g` mappings; custom status columns are preserved too.
 
 ## Configuration
 
@@ -122,6 +156,11 @@ require("gitvim").setup({
   buffer = {
     blame = true,           -- current-line blame virtual text
     clickable_gutter = true, -- double-click a sign to expand the hunk
+  },
+  scm = {
+    row_actions = true,     -- [+] [-] [<] buttons on rows and group headers
+    confirm_discard = true,
+    signoff = false,        -- add Signed-off-by to every commit
   },
   keymaps = { enabled = true, prefix = "<leader>g" },
 })

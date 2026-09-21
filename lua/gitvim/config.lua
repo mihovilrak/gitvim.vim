@@ -86,8 +86,11 @@ local defaults = {
     collapsed = {},
     --- Ask before discarding working-tree changes. Turning this off is on you.
     confirm_discard = true,
-    --- Show `[+] [-] [<]` buttons on the focused row.
+    --- Show `[+]` `[-]` `[<]` stage/unstage/discard buttons on file rows and
+    --- group headers.
     row_actions = true,
+    --- Add a `Signed-off-by` trailer to every commit (`--signoff`).
+    signoff = false,
   },
 
   --- GRAPH section of the Git tab.
@@ -163,7 +166,8 @@ local defaults = {
     },
     --- Replace individual chrome glyphs by name: `files`, `search`, `git`,
     --- `buffers`, `chevron_open`, `chevron_closed`, `file`, `directory`,
-    --- `directory_open`, `commit`, `ahead`, `behind`.
+    --- `directory_open`, `commit`, `ahead`, `behind`, `stage`, `unstage`,
+    --- `discard`.
     ---@type table<string, string>
     overrides = {},
   },
@@ -310,6 +314,7 @@ local function validate(o)
   vim.validate("scm.collapsed", o.scm.collapsed, list_of(is_group, "group names"))
   vim.validate("scm.confirm_discard", o.scm.confirm_discard, "boolean")
   vim.validate("scm.row_actions", o.scm.row_actions, "boolean")
+  vim.validate("scm.signoff", o.scm.signoff, "boolean")
 
   vim.validate("graph.page_size", o.graph.page_size, min_int(1))
   vim.validate("graph.lane_colors", o.graph.lane_colors, min_int(1))

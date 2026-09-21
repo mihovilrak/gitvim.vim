@@ -4,6 +4,25 @@ local M = {}
 
 local TABS = { "files", "search", "git", "buffers" }
 
+--- A Source Control subcommand: runs `gitvim.actions[name]` against the
+--- current buffer's repository.
+---@param desc string
+---@param name string
+---@return gitvim.Subcommand
+local function scm(desc, name)
+  return {
+    desc = desc,
+    run = function()
+      local actions = require("gitvim.actions")
+      actions.in_current_repo(function()
+        actions[name]()
+      end)
+    end,
+  }
+end
+
+local COMMIT_FLAGS = { "--amend", "--signoff" }
+
 ---@class gitvim.Subcommand
 ---@field run fun(args: string[])
 ---@field desc string
@@ -80,6 +99,56 @@ local subcommands = {
       end)
     end,
   },
+  stage = {
+    desc = "stage the current file",
+    run = function()
+      require("gitvim.actions").stage_file()
+    end,
+  },
+  unstage = {
+    desc = "unstage the current file",
+    run = function()
+      require("gitvim.actions").unstage_file()
+    end,
+  },
+  discard = {
+    desc = "discard working-tree changes to the current file",
+    run = function()
+      require("gitvim.actions").discard_file()
+    end,
+  },
+  ["stage-all"] = scm("stage every change", "stage_all"),
+  ["unstage-all"] = scm("unstage everything", "unstage_all"),
+  ["discard-all"] = scm("discard every working-tree change", "discard_all"),
+  commit = {
+    desc = "open the commit message editor (--amend, --signoff)",
+    run = function(args)
+      local opts = {}
+      for _, arg in ipairs(args) do
+        if arg == "--amend" then
+          opts.amend = true
+        elseif arg == "--signoff" then
+          opts.signoff = true
+        else
+          vim.notify(("gitvim: unknown commit flag '%s'"):format(arg), vim.log.levels.ERROR)
+          return
+        end
+      end
+      local actions = require("gitvim.actions")
+      actions.in_current_repo(function()
+        actions.commit(opts)
+      end)
+    end,
+    complete = function(_, args)
+      return vim.tbl_filter(function(flag)
+        return not vim.tbl_contains(args, flag)
+      end, COMMIT_FLAGS)
+    end,
+  },
+  fetch = scm("fetch from the remotes", "fetch"),
+  pull = scm("pull the current branch", "pull"),
+  push = scm("push the current branch, publishing it if needed", "push"),
+  checkout = scm("switch to another local branch", "checkout"),
   health = {
     desc = "run :checkhealth gitvim",
     run = function()
