@@ -46,8 +46,14 @@ local function scan(dir)
   local stat = vim.uv.fs_stat(dir)
   local cached = scans[dir]
   local mtime = stat and stat.mtime
-  if cached and cached.show_hidden == show_hidden and cached.mtime
-    and mtime and cached.mtime.sec == mtime.sec and cached.mtime.nsec == mtime.nsec then
+  if
+    cached
+    and cached.show_hidden == show_hidden
+    and cached.mtime
+    and mtime
+    and cached.mtime.sec == mtime.sec
+    and cached.mtime.nsec == mtime.nsec
+  then
     return cached.entries
   end
   local handle = vim.uv.fs_scandir(dir)
@@ -66,8 +72,8 @@ local function scan(dir)
       local path = dir .. "/" .. name
       local is_dir = kind == "directory"
       if kind == "link" then
-        local stat = vim.uv.fs_stat(path)
-        is_dir = stat ~= nil and stat.type == "directory"
+        local target_stat = vim.uv.fs_stat(path)
+        is_dir = target_stat ~= nil and target_stat.type == "directory"
       end
       out[#out + 1] = { name = name, path = path, dir = is_dir }
     end

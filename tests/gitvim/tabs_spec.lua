@@ -219,8 +219,10 @@ describe("Files tab", function()
     assert.equals(hl.kind.modified, row[#row].hl)
   end)
 
-  it("says so, rather than drawing a tree, outside a repository", function()
-    assert.is_true(has(files.rows({ width = 40, focused = false }), "Not a git repository"))
+  it("shows the current directory tree outside a repository", function()
+    local rows = files.rows({ width = 40, focused = false })
+    assert.equals(vim.fs.basename(vim.uv.cwd()):upper(), rows[1][1].text)
+    assert.is_table(find(rows, "Makefile"))
   end)
 end)
 
