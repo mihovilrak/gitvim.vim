@@ -2,7 +2,7 @@
 
 Author:   Mihovil Rak
 License:  MIT
-Version:  0.0.0-dev
+Version:  0.1.0
 
 ==============================================================================
 CONTENTS                                                     *gitvim-contents*
@@ -17,34 +17,38 @@ CONTENTS                                                     *gitvim-contents*
     8. Buffer layer .......................... |gitvim-buffer|
     9. Highlights ............................ |gitvim-highlights|
    10. Health ................................ |gitvim-health|
-   11. Development ........................... |gitvim-development|
-
-NOTE: gitvim.nvim is pre-alpha. Sections marked (planned) describe behaviour
-that is designed and scheduled but not yet implemented. See Plan.md in the
-repository for the design decisions and the task checklist.
+   11. Performance ........................... |gitvim-performance|
+   12. Development ........................... |gitvim-development|
 
 ==============================================================================
 1. INTRODUCTION                                          *gitvim-introduction*
 
 gitvim.nvim assembles Neovim's Git capabilities into one docked, discoverable
-surface modelled on VS Code's Source Control view, plus GitLens-style blame and
-a Git Graph-style commit graph.
+surface modelled on VS Code's Source Control view, plus GitLens-style blame
+and a Git Graph-style commit graph.
 
-It is an orchestration layer. gitvim owns the sidebar, the graph, the timeline,
-the commit UI and the remote operations; it delegates the in-buffer layer
-(signs, hunks, blame) to gitsigns.nvim through a single bridge module, so the
-coupling stays thin and auditable.
+It is an orchestration layer. gitvim owns the sidebar, the graph, the
+timeline, the commit UI and the remote operations; it delegates the
+in-buffer layer (signs, hunks, blame) to gitsigns.nvim through a single
+bridge module, so the coupling stays thin and auditable.
 
 ==============================================================================
 2. REQUIREMENTS                                          *gitvim-requirements*
 
     Neovim 0.11 or newer
     git 2.30 or newer
-    gitsigns.nvim                                   (required)
-    snacks.nvim                                     (optional, sidebar window)
-    mini.icons                                      (optional, filetype icons)
+    gitsigns.nvim                   (required) signs, blame, hunk staging
+    ripgrep                         (optional) the Search tab; falls back to
+                                    `git grep`, which searches tracked files
+                                    only and cannot expand `$1`
+    mini.icons or nvim-web-devicons (optional) filetype icons
+    snacks.nvim                     (optional) nicer pickers, inputs and
+                                    notifications: gitvim only calls
+                                    |vim.ui.select()|, |vim.ui.input()| and
+                                    |vim.notify()|, whoever provides them
+    a Nerd Font                     (optional) see `icons.style`
 
-Both optional dependencies have fallbacks. Run |:checkhealth| gitvim to see
+Every optional dependency has a fallback. Run |:checkhealth| gitvim to see
 what was detected.
 
 ==============================================================================
@@ -62,8 +66,26 @@ With lazy.nvim: >lua
       opts = {},
     }
 <
-Calling `setup()` is optional if you are happy with the defaults; the |:GitVim|
-command initialises the plugin on first use.
+                                                              *gitvim-lazyvim*
+In LazyVim, drop the same spec into `lua/plugins/gitvim.lua`. gitsigns and
+snacks are already there, and LazyVim's own `<leader>g` maps take precedence
+over gitvim's buffer maps (see |gitvim-keymaps|); pick another prefix to get
+all of them: >lua
+
+    return {
+      "mihovilrak/gitvim.nvim",
+      dependencies = { "lewis6991/gitsigns.nvim" },
+      cmd = "GitVim",
+      keys = {
+        { "<leader>gv", "<cmd>GitVim toggle<cr>", desc = "GitVim sidebar" },
+      },
+      opts = {
+        keymaps = { prefix = "<leader>v" },
+      },
+    }
+<
+Calling `setup()` is optional if you are happy with the defaults; the
+|:GitVim| command initialises the plugin on first use.
 
                                                             *gitvim.setup()*
 require("gitvim").setup({opts})
@@ -79,44 +101,88 @@ require("gitvim").open({tab})
 require("gitvim").close()
 
                                                            *gitvim.toggle()*
-require("gitvim").toggle()
+require("gitvim").toggle({tab})
+    Open the sidebar if it is closed, close it otherwise.
+
+                                                          *gitvim.refresh()*
+require("gitvim").refresh({path}, {cb})
+    Re-read git status for the repository around {path} (default: the
+    current buffer). {cb} is called as `cb(err, store)`.
+
+                                                           *gitvim.review()*
+require("gitvim").review({root}, {path}, {opts})
+    Open |gitvim-review| for {path}, relative to {root}. See the example
+    there for {opts}.
+
+                                                     *gitvim.toggle_blame()*
+require("gitvim").toggle_blame({value})
+    Toggle current-line blame, or set it to {value}. Returns the new state.
+
+                                                *gitvim.open_blame_commit()*
+require("gitvim").open_blame_commit()
+    Select the current line's commit in |gitvim-graph|.
+
+                                                           *gitvim.config()*
+require("gitvim").config()
+    The merged configuration table. Read it; do not modify it.
 
 ==============================================================================
 4. COMMANDS                                                  *gitvim-commands*
 
                                                                     *:GitVim*
+                                                                *:GitVim-open*
 :GitVim open [{tab}]    Open the sidebar. {tab} is "files", "search",
                         "git" or "buffers"; defaults to
                         `sidebar.default_tab`.
+                                                               *:GitVim-close*
 :GitVim close           Close the sidebar.
+                                                              *:GitVim-toggle*
 :GitVim toggle          Toggle the sidebar.
+                                                               *:GitVim-blame*
 :GitVim blame           Toggle current-line blame.
+                                                        *:GitVim-blame-commit*
 :GitVim blame-commit    Select the current line's commit in GRAPH.
+                                                               *:GitVim-stage*
 :GitVim stage           Stage the current file.
+                                                             *:GitVim-unstage*
 :GitVim unstage         Unstage the current file.
+                                                             *:GitVim-discard*
 :GitVim discard         Discard the current file's working-tree changes
                         (an untracked file is deleted).
+                                                           *:GitVim-stage-all*
 :GitVim stage-all       Stage every change, untracked files included.
+                                                         *:GitVim-unstage-all*
 :GitVim unstage-all     Unstage everything.
+                                                         *:GitVim-discard-all*
 :GitVim discard-all     Discard every working-tree change and delete
                         untracked files. Staged changes are kept.
+                                                              *:GitVim-commit*
 :GitVim commit [--amend] [--signoff]
                         Open the commit message editor, see
                         |gitvim-commit|.
+                                                               *:GitVim-fetch*
 :GitVim fetch           Fetch from the remotes.
+                                                                *:GitVim-pull*
 :GitVim pull            Pull the current branch.
+                                                                *:GitVim-push*
 :GitVim push            Push the current branch. A branch without an
                         upstream is published with `--set-upstream`.
+                                                            *:GitVim-checkout*
 :GitVim checkout        Pick another local branch and switch to it.
+                                                              *:GitVim-review*
 :GitVim review [{rev}]  Open |gitvim-review| for the current file: the
                         index against the working tree, or {rev} against
                         the working tree.
+                                                            *:GitVim-timeline*
 :GitVim timeline [{path}]
                         Show a file's history in |gitvim-timeline|:
                         {path} is pinned there; without it, the current
                         file is shown (unless another file is pinned).
+                                                             *:GitVim-refresh*
 :GitVim refresh         Re-read git status for the current repository.
+                                                              *:GitVim-status*
 :GitVim status          Echo a one-line summary of the repository.
+                                                              *:GitVim-health*
 :GitVim health          Run |:checkhealth| gitvim.
 
 Subcommands and the commit flags complete with <Tab>. Every discard asks
@@ -129,8 +195,8 @@ operations report their progress with |vim.notify()|.
 `lua/gitvim/config.lua` is the authoritative reference; every key below is
 deep-merged over the defaults.
 
-sidebar~
-    position        "left"|"right"      default "left"
+sidebar~                                               *gitvim-config-sidebar*
+    position        "left" or "right", default "left"
     width           number              default 40
     stack           boolean             default false
                     Share the side column with an existing split (such as
@@ -140,34 +206,35 @@ sidebar~
     default_tab     string              default "git"
     close_on_open   boolean             default false
 
-files~
-    root            "repo"|"cwd"  what the tree is rooted at, default "repo"
+files~                                                   *gitvim-config-files*
+    root            "repo" or "cwd", what the tree is rooted at,
+                    default "repo"
     show_hidden     boolean   show dotfiles, default true
     show_ignored    boolean   show .gitignore'd files, default false
     git_status      boolean   tint names by their git status
     follow_buffer   boolean   reveal the active buffer's file
 
-search~
+search~                                                 *gitvim-config-search*
     case_sensitive  boolean   initial state of the [Aa] toggle
     whole_word      boolean   initial state of the [ab] toggle
     regex           boolean   initial state of the [.*] toggle
     include         string    initial "files to include" glob
     exclude         string    initial "files to exclude" glob
-    max_results     number    default 2000
-    confirm_replace boolean   ask before a replace-all writes to disk
+    max_results     number    default 2000, the search stops there
+    confirm_replace boolean   ask before replacing a file or all results
 
-git~
+git~                                                       *gitvim-config-git*
     sections        string[]  default { "scm", "graph", "timeline" }, the
                               collapsible sections of the Git tab
     collapsed       string[]  sections folded on first open, default
                               { "graph", "timeline" }
 
-buffers~
+buffers~                                               *gitvim-config-buffers*
     show_unlisted   boolean   include buffers hidden from :ls
-    sort            "mru"|"number"|"name"   default "mru"
+    sort            "mru", "number" or "name", default "mru"
     group_by_dir    boolean   group the list by directory
 
-scm~
+scm~                                                       *gitvim-config-scm*
     groups          string[]  default { "merge", "staged", "changes",
                               "untracked" }
     collapsed       string[]  groups collapsed on first open
@@ -178,23 +245,23 @@ scm~
     signoff         boolean   default false, add a Signed-off-by trailer
                               to every commit
 
-graph~
+graph~                                                   *gitvim-config-graph*
     page_size       number    default 256, more load on scroll
     lane_colors     number    default 8, palette length before cycling
-    date_format     "relative"|"short"|"iso"
+    date_format     "relative", "short" or "iso", default "relative"
     show_refs       boolean   render branch/tag badges
 
-timeline~
+timeline~                                             *gitvim-config-timeline*
     page_size       number    default 128
     follow_renames  boolean   use `git log --follow`
     follow_buffer   boolean   track the active buffer automatically
 
-review~
-    layout          "split"|"unified"
+review~                                                 *gitvim-config-review*
+    layout          "split" or "unified", default "split"
     diffopt         string[]  appended to 'diffopt' in review windows
     hunk_actions    boolean   right-aligned per-hunk buttons
 
-buffer~
+buffer~                                                 *gitvim-config-buffer*
     signs            boolean  apply gitvim's sign theme to gitsigns
     blame            boolean  current-line blame virtual text
     blame_format     string   default
@@ -203,18 +270,31 @@ buffer~
                      composes with an existing 'statuscolumn' rather than
                      replacing it
 
-refresh~
+refresh~                                               *gitvim-config-refresh*
     debounce        number    milliseconds, default 50
     watch_gitdir    boolean   watch .git for external git operations
     events          string[]  default { "BufWritePost", "FocusGained" }
-
-icons~
-    enabled         boolean
+icons~                                                   *gitvim-config-icons*
+    enabled         boolean   default true; false uses text stand-ins
+    style           "auto", "nerd" or "ascii", default "auto"
+                    "nerd" uses Nerd Font glyphs, "ascii" plain characters
+                    (`[/]`, `v`, `>`, `[+]`...). "auto" picks "nerd" unless
+                    `vim.g.have_nerd_font` is false.
     status          table     letters per status: modified "M", added "A",
-                              deleted "D", renamed "R", copied "C", typechange "T",
-                              untracked "U", ignored "I", conflict "!"
+                              deleted "D", renamed "R", copied "C",
+                              typechange "T", untracked "U", ignored "I",
+                              conflict "!"
+    overrides       table     replace single glyphs by name, whatever the
+                              style: files, search, git, buffers,
+                              chevron_open, chevron_closed, file, directory,
+                              directory_open, commit, ahead, behind, stage,
+                              unstage, discard, current, modified, expand >lua
+                    icons = { overrides = { search = "S", commit = "o" } }
+<
+    Filetype icons come from mini.icons, else nvim-web-devicons, else a
+    generic file icon.
 
-keymaps~
+keymaps~                                               *gitvim-config-keymaps*
     enabled         boolean   default true
     prefix          string    default "<leader>g"
 
@@ -224,6 +304,16 @@ keymaps~
 The sidebar is an activity bar with four tabs, rendered in the window's
 'winbar' and ordered by `sidebar.tabs`. Click one, cycle with <Tab> and
 <S-Tab>, or jump straight to one with 1-4.
+
+                                                         *gitvim-sidebar-keys*
+Keys that work on every tab:
+
+    <Tab>  <S-Tab>  next / previous tab
+    1  2  3  4      jump to a tab, in `sidebar.tabs` order
+    <CR>            the row's action (each tab lists its own)
+    <2-LeftMouse>   the same, with the mouse; single clicks hit buttons
+    R               refresh
+    q               close the sidebar
 
 FILES                                                           *gitvim-files*
     A plain file tree rooted at the repository (or at the current directory,
@@ -235,7 +325,36 @@ SEARCH                                                         *gitvim-search*
     Labelled with the magnifier icon alone. A form of four fields: Pattern,
     with VS Code's case-sensitive / whole-word / regular-expression toggles;
     Replace; Include, and Exclude for file globs. The form's state is kept per
-    repository. Running the search and the replace is not implemented yet.
+    repository.
+
+    The search runs as the form changes, asynchronously, through ripgrep
+    when `rg` is executable and `git grep` otherwise, and stops after
+    `search.max_results` matches (the summary then says "capped"). Include
+    and Exclude take comma-separated globs with ripgrep's semantics: `*.lua`
+    matches at any depth, `docs/**` everything under docs. Results are
+    grouped per file under a foldable header with a count.
+
+    With a Replace text every match previews its replacement inline. In regex
+    mode ripgrep expands capture groups: `$1`, `${name}`, and `${0}` for the
+    whole match (write `${1}x`, not `$1x`). Other modes replace literally.
+
+    Keys~
+        <CR>, i     edit the field under the cursor
+        <M-c>       toggle case-sensitive
+        <M-w>       toggle whole word
+        <M-r>       toggle regular expression
+        <C-l>       clear the search and its results
+        R           run the search again
+        <CR>        on a file header: fold it; on a match: open the file at
+                    the match in the editor window, never in the sidebar
+        r           replace the match's line, or a file header's file
+        A           replace every result; `[replace all]` does the same
+
+    Replacing a file or all results asks first when `search.confirm_replace`
+    is set; a single line never asks. Each file is changed in one undo block
+    and written, except a buffer that already had unsaved edits, which is
+    left unsaved. A line that changed since the search is skipped, and the
+    search re-runs afterwards.
 
 GIT                                                               *gitvim-git*
     The project proper: SOURCE CONTROL, GRAPH and TIMELINE as collapsible
@@ -251,7 +370,8 @@ SOURCE CONTROL                                                    *gitvim-scm*
     Collapsible groups with counts: Merge Changes, Staged, Changes and
     Untracked. Each row carries a status letter, a filetype icon and VS Code
     colouring; renames show both paths. The header shows the repository,
-    branch and ahead/behind counters. Group state is remembered per repository.
+    branch and ahead/behind counters. Group state is remembered per
+    repository.
 
     The first row is the commit line: the draft's subject (or "Message")
     and a Commit button, which reads "Commit (nothing staged)" when the
@@ -327,8 +447,8 @@ TIMELINE                                                     *gitvim-timeline*
     the "Load more…" row into view fetches the next page. The pages come
     from one `git log`, paused between pages, so deep history is read only
     once; after 30 seconds idle it is ended, and started again when the next
-    page is asked for. The timeline reloads itself on every refresh and whenever HEAD, the branch or its
-    upstream moves.
+    page is asked for. The timeline reloads itself on every refresh and
+    whenever HEAD, the branch or its upstream moves.
 
     An untracked file says so without asking git, a staged file that has
     never been committed shows "Not committed yet.", and a file git has
@@ -400,6 +520,7 @@ gutter. Double-clicking a sign expands that hunk inline; right-clicking opens
 a hunk action menu. An existing 'statuscolumn', including a dynamic one such
 as snacks.statuscolumn, is composed rather than replaced.
 
+                                                              *gitvim-keymaps*
 Default mappings (under `keymaps.prefix`, `<leader>g` by default):
 
     hs    stage hunk                 hu    undo last staged hunk
@@ -423,17 +544,92 @@ VeryLazy), gitvim's map is removed and yours wins. The public Lua helpers
 ==============================================================================
 9. HIGHLIGHTS                                              *gitvim-highlights*
 
-All groups are linked to existing semantic groups, never hardcoded colours, so
-they follow your colorscheme.
+All groups are default links to existing semantic groups, never hardcoded
+colours, so they follow your colorscheme and are re-linked after
+|:colorscheme|. Define a group yourself (after your colorscheme loads) and
+gitvim leaves it alone: >lua
 
-    GitVimAdded             new file / added hunk
-    GitVimModified          modified file / changed hunk
-    GitVimDeleted           deleted file / removed hunk
-    GitVimUntracked         untracked file
-    GitVimRenamed           renamed file
-    GitVimConflict          unmerged file
-    GitVimBlame             current-line blame text
-    GitVimGraphLane1..8     graph lane palette
+    vim.api.nvim_set_hl(0, "GitVimBranch", { link = "Keyword" })
+<
+    Group                   Default link      Used for~
+    File status (sidebar rows, signs, review)~
+    GitVimAdded             Added             added file / added hunk
+    GitVimModified          Changed           modified file / changed hunk
+    GitVimDeleted           Removed           deleted file / removed hunk
+    GitVimRenamed           Special           renamed file
+    GitVimCopied            Special           copied file
+    GitVimTypechange        Changed           file whose type changed
+    GitVimUntracked         Comment           untracked file
+    GitVimIgnored           Comment           ignored file
+    GitVimConflict          DiagnosticWarn    unmerged file
+
+    Sidebar~
+    GitVimNormal            NormalFloat       sidebar background
+    GitVimTitle             Title             titles
+    GitVimSection           Title             SOURCE CONTROL, GRAPH, TIMELINE
+    GitVimGroup             Directory         Staged, Changes, Untracked...
+    GitVimCount             Comment           group and file counts
+    GitVimChevron           Comment           fold chevrons
+    GitVimIcon              Comment           row icons
+    GitVimDir               Comment           dimmed leading directories
+    GitVimFile              Normal            file basename
+    GitVimHint              Comment           empty-state text
+    GitVimBufferCurrent     Special           BUFFERS: the current buffer
+    GitVimError             DiagnosticError   inline errors
+    GitVimSeparator         WinSeparator      separators
+    GitVimRepo              Title             repository name
+    GitVimBranch            Identifier        branch name
+    GitVimAhead             DiagnosticInfo    commits ahead of upstream
+    GitVimBehind            DiagnosticWarn    commits behind upstream
+    GitVimButton            Comment           row buttons [+] [-] [<]
+    GitVimButtonActive      Special           an enabled button
+
+    Activity tabs (winbar)~
+    GitVimTab               TabLine           a tab
+    GitVimTabSel            TabLineSel        the active tab
+    GitVimTabFill           TabLineFill       the rest of the bar
+    GitVimTabIcon           TabLine           a tab's icon
+    GitVimTabIconSel        TabLineSel        the active tab's icon
+
+    Search~
+    GitVimLabel             Label             field labels
+    GitVimField             NormalFloat       field text
+    GitVimFieldEmpty        Comment           field placeholder
+    GitVimToggleOn          Search            an enabled [Aa] [ab] [.*] toggle
+    GitVimToggleOff         Comment           a disabled toggle
+    GitVimMatch             Search            a match
+    GitVimMatchRemoved      Removed           a match that Replace will change
+    GitVimReplace           Added             its replacement preview
+
+    Graph and timeline~
+    GitVimGraphNode         Special           HEAD's commit node
+    GitVimGraphSubject      Normal            commit subject
+    GitVimGraphAuthor       Identifier        author
+    GitVimGraphDate         Comment           date
+    GitVimRefHead           DiagnosticOk      badge: the current branch
+    GitVimRefLocal          Identifier        badge: other local branches
+    GitVimRefRemote         Constant          badge: remote branches
+    GitVimRefTag            Type              badge: tags
+    GitVimGraphLane1        Function          lane colour 1
+    GitVimGraphLane2        String            lane colour 2
+    GitVimGraphLane3        Identifier        lane colour 3
+    GitVimGraphLane4        Constant          lane colour 4
+    GitVimGraphLane5        Keyword           lane colour 5
+    GitVimGraphLane6        Type              lane colour 6
+    GitVimGraphLane7        Special           lane colour 7
+    GitVimGraphLane8        Number            lane colour 8
+
+    Review and buffer layer~
+    GitVimHunkButton        Special           per-hunk buttons in review
+    GitVimReviewLabel       Title             pane labels in review
+    GitVimBlame             Comment           current-line blame text
+
+When `buffer.signs` is set, gitsigns' own groups are linked to these, so
+signs share the sidebar's colours: `GitSigns{Add,Change,Changedelete,Delete,`
+`Topdelete,Untracked}`, each with its `Nr` and `Cul` variants and the
+`GitSignsStaged*` counterparts, and `GitSignsCurrentLineBlame` (to
+GitVimBlame). These links are set on every |ColorScheme|, so override the
+GitVim group rather than the GitSigns one.
 
 Override with |:highlight| after your colorscheme loads.
 
@@ -443,12 +639,42 @@ Override with |:highlight| after your colorscheme loads.
 >vim
     :checkhealth gitvim
 <
-Reports the Neovim and git versions, whether gitsigns, snacks and mini.icons
-were found, whether 'mouse' is enabled for click handling, and whether the
-current directory is inside a git repository.
+Checks, in four sections:
+
+editor~
+    Neovim 0.11+, and whether 'mouse' is set (clicks need it; every action
+    also has a key).
+dependencies~
+    gitsigns.nvim, and that it exposes every function gitvim calls (an
+    outdated gitsigns is an error); snacks.nvim; the icon provider; ripgrep,
+    or a warning about the `git grep` fallback; git 2.30+.
+configuration~
+    Whether `setup()` has run; `icons.style` against `vim.g.have_nerd_font`;
+    `buffer.clickable_gutter` with 'mouse' off, or composed with your own
+    'statuscolumn'; buffer keymaps that yield to an existing global mapping
+    (see |gitvim-keymaps|), and a mapping on the prefix itself, which makes
+    every key under it wait for 'timeoutlen'.
+repository~
+    The work tree, git directory, HEAD and upstream around the current
+    buffer (or the working directory), and whether `user.name` and
+    `user.email` are set -- without them every commit fails.
 
 ==============================================================================
-11. DEVELOPMENT                                           *gitvim-development*
+11. PERFORMANCE                                           *gitvim-performance*
+
+git runs off the main loop, always: every call goes through |vim.system()|
+with a callback, and parsing large output yields between chunks. The
+release gates, measured by `scripts/bench.lua` on a generated repository
+with 10k+ commits and 1k+ changed files (`make bench`):
+
+    sidebar open, first paint                  < 200 ms
+    GRAPH first page rendered                  < 150 ms
+    longest main-loop block during a refresh   < 16 ms
+
+The measured numbers are recorded in Plan.md.
+
+==============================================================================
+12. DEVELOPMENT                                           *gitvim-development*
 
 >bash
     make test        # headless plenary suite
@@ -456,6 +682,7 @@ current directory is inside a git repository.
     make fmt         # stylua
     make lint        # luacheck
     make docs        # regenerate doc/tags
+    make bench       # performance gates, see |gitvim-performance|
     make all         # fmt-check + lint + test
 <
 Dependencies are cloned into `.tests/` on the first run. Tests build a

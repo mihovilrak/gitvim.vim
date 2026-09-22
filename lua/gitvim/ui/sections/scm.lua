@@ -180,6 +180,27 @@ local function commit_row(ctx, staged)
   return row
 end
 
+--- File rows from the previous render, keyed by what they display. A refresh
+--- re-parses every entry, but on a large status almost none of them changed;
+--- reusing their rows lets the renderer skip them too (see Renderer:set).
+--- Dropped whenever the options, the width or the font signal change (the
+--- glyphs depend on all three), and rebuilt from only the rows in use each
+--- render, so it never outgrows the status.
+local memo = { rows = {} }
+
+---@param entry gitvim.status.Entry
+---@param width integer
+---@param used table<string, gitvim.render.Row>
+---@return gitvim.render.Row
+local function cached_entry_row(entry, width, used)
+  local id = table.concat({ entry.group, entry.kind, entry.path, entry.orig_path or "" }, "\0")
+  local row = memo.rows[id] or entry_row(entry, width)
+  -- Same text, fresh entry: actions read the latest status through `data`.
+  row.data = entry
+  used[id] = row
+  return row
+end
+
 ---@param ctx gitvim.ui.TabCtx
 ---@return gitvim.render.Row[]
 function M.rows(ctx)
@@ -190,6 +211,12 @@ function M.rows(ctx)
     return { tabs.hint("Loading status...") }
   end
 
+  local font = vim.g.have_nerd_font
+  if memo.options ~= config.options or memo.width ~= ctx.width or memo.font ~= font then
+    memo = { options = config.options, width = ctx.width, font = font, rows = {} }
+  end
+  local used = {}
+
   local groups = ctx.store:groups()
   local rows = { commit_row(ctx, #(groups.staged or {})) }
   for _, group in ipairs(config.options.scm.groups) do
@@ -198,11 +225,12 @@ function M.rows(ctx)
       rows[#rows + 1] = group_row(ctx, group, #entries)
       if not collapsed(ctx.store, group) then
         for _, entry in ipairs(entries) do
-          rows[#rows + 1] = entry_row(entry, ctx.width)
+          rows[#rows + 1] = cached_entry_row(entry, ctx.width, used)
         end
       end
     end
   end
+  memo.rows = used
 
   if #rows == 1 then
     rows[2] = tabs.hint("No changes.")

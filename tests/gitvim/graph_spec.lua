@@ -199,6 +199,14 @@ describe("GRAPH section", function()
     assert.is_not_nil(text(row):find("…", 1, true))
   end)
 
+  it("reuses commit rows across renders until the width changes", function()
+    refresh_status()
+    local first = commits(settle())[1]
+    assert.equals(first, commits(graph.rows(ctx))[1])
+    ctx.width = 50
+    assert.are_not.equal(first, commits(graph.rows(ctx))[1])
+  end)
+
   describe("format_date", function()
     local now = 1700000000
 

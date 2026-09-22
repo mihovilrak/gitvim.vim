@@ -160,6 +160,10 @@ function Renderer:_mark(lnum, row)
 end
 
 --- Replace the buffer's contents with `rows`, touching only what changed.
+---
+--- A row is treated as immutable once it has been passed here: its flattened
+--- text and diff key are cached on it, so a tab may hand the same row table
+--- to several redraws, but must build a new one to change what it shows.
 ---@param rows gitvim.render.Row[]
 function Renderer:set(rows)
   if not vim.api.nvim_buf_is_valid(self.buf) then
@@ -168,10 +172,15 @@ function Renderer:set(rows)
 
   local lines, keys = {}, {}
   for i, row in ipairs(rows) do
-    local line, starts, stops = flatten(row)
-    row._starts, row._stops = starts, stops
-    lines[i] = line
-    keys[i] = key(row, line)
+    -- A row a tab handed over before (a memoized one) keeps what was computed
+    -- for it last time: on a large status that is most of the redraw.
+    if not row._key then
+      local line, starts, stops = flatten(row)
+      row._line, row._starts, row._stops = line, starts, stops
+      row._key = key(row, line)
+    end
+    lines[i] = row._line
+    keys[i] = row._key
   end
 
   local old_keys = self._keys

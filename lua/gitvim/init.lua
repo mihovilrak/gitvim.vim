@@ -4,7 +4,7 @@
 
 local M = {}
 
-M.version = "0.0.0-dev"
+M.version = "0.1.0"
 
 local did_setup = false
 local detecting = false
@@ -59,6 +59,12 @@ function M.setup(opts)
   })
   require("gitvim.buffer.signs").setup()
   require("gitvim.git.watcher").setup()
+end
+
+--- Whether `setup()` has run; for :checkhealth.
+---@return boolean
+function M._is_setup()
+  return did_setup
 end
 
 --- Toggle current-line blame annotations.

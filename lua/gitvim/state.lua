@@ -17,6 +17,7 @@ local M = {}
 ---| "dirty"    # a slot was invalidated; payload { root, slot }
 ---| "graph"    # the GRAPH history or an expanded commit arrived; payload { root }
 ---| "timeline" # a file's TIMELINE history arrived; payload { root }
+---| "search"   # Search tab results arrived or were cleared; payload { root }
 ---| "error"    # a git call failed; payload { root, err }
 
 ---@class gitvim.state.Search
@@ -28,6 +29,13 @@ local M = {}
 ---@field word boolean    whole word
 ---@field regex boolean   treat the pattern as a regular expression
 
+---@class gitvim.state.Results
+---@field query gitvim.state.Search         the form as it was when the search ran
+---@field running boolean
+---@field result? gitvim.grep.Result
+---@field err? string
+---@field collapsed table<string, boolean>  file path -> folded in the results
+
 ---@class gitvim.Store
 ---@field root string
 ---@field status? gitvim.status.Result
@@ -38,6 +46,7 @@ local M = {}
 ---@field graph? gitvim.graph.State         GRAPH history, loaded by its section
 ---@field timeline? gitvim.timeline.State   TIMELINE file and history, per repo
 ---@field search gitvim.state.Search        Search tab form contents, per repo
+---@field results? gitvim.state.Results      Search tab results, per repo
 ---@field dirty table<gitvim.state.Slot, boolean>
 local Store = {}
 Store.__index = Store

@@ -139,12 +139,18 @@ function M.editor_buf()
   return vim.api.nvim_win_get_buf(win)
 end
 
---- Show a file in the editor window.
+--- Show a file in the editor window, optionally at a position.
 ---@param path string
-function M.open_file(path)
+---@param pos? integer[]  { lnum, col } with a 0-based byte col, as nvim_win_set_cursor
+function M.open_file(path, pos)
   local win = editor_window()
   vim.api.nvim_win_call(win, function()
     vim.cmd.edit(vim.fn.fnameescape(path))
+    if pos then
+      local last = vim.api.nvim_buf_line_count(0)
+      pcall(vim.api.nvim_win_set_cursor, win, { math.min(pos[1], last), pos[2] or 0 })
+      vim.cmd("normal! zv")
+    end
   end)
   vim.api.nvim_set_current_win(win)
   if config.options.sidebar.close_on_open then
@@ -414,6 +420,21 @@ function M.redraw()
   reach()
 end
 
+local redraw_pending = false
+
+--- Redraw on the next turn of the loop, once however many times this is
+--- called before then.
+function M.schedule_redraw()
+  if redraw_pending then
+    return
+  end
+  redraw_pending = true
+  vim.schedule(function()
+    redraw_pending = false
+    M.redraw()
+  end)
+end
+
 -- ---------------------------------------------------------------------------
 -- tabs
 -- ---------------------------------------------------------------------------
@@ -534,10 +555,12 @@ local function wire()
     end,
   })
 
-  for _, event in ipairs({ "status", "head", "graph", "timeline" }) do
+  -- A refresh emits "head" and "status" back to back; both land in one
+  -- scheduled redraw rather than two.
+  for _, event in ipairs({ "status", "head", "graph", "timeline", "search" }) do
     state.subscribe(event, function()
       if M.is_open() then
-        vim.schedule(M.redraw)
+        M.schedule_redraw()
       end
     end)
   end

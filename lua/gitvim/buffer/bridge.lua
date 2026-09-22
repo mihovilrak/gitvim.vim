@@ -6,6 +6,21 @@
 
 local M = {}
 
+--- Every gitsigns function gitvim calls. :checkhealth verifies each one, so
+--- an incompatible gitsigns shows up there rather than as silent no-ops.
+M.api = {
+  "setup",
+  "get_hunks",
+  "statuscolumn",
+  "stage_hunk",
+  "reset_hunk",
+  "undo_stage_hunk",
+  "preview_hunk_inline",
+  "blame_line",
+  "toggle_current_line_blame",
+  "nav_hunk",
+}
+
 ---@type table?
 local injected
 
@@ -30,6 +45,23 @@ local function call(name, ...)
   end
   local ok, result = pcall(fn, ...)
   return ok, result
+end
+
+--- The functions from `M.api` the installed gitsigns lacks (all of them when
+--- it is not installed at all).
+---@return string[]
+function M.missing()
+  local gitsigns = adapter()
+  local out = {}
+  for _, name in ipairs(M.api) do
+    local ok, fn = pcall(function()
+      return gitsigns and gitsigns[name]
+    end)
+    if not ok or type(fn) ~= "function" then
+      out[#out + 1] = name
+    end
+  end
+  return out
 end
 
 ---@param opts? table

@@ -114,6 +114,17 @@ describe("Renderer:set", function()
     assert.equals(tick, vim.api.nvim_buf_get_changedtick(buf))
   end)
 
+  it("keeps what it computed for a row handed over again", function()
+    -- Rows are immutable once set: a changed row must be a new table.
+    local row = { { text = "one" } }
+    r:set({ row })
+    row[1].text = "mutated"
+    r:set({ row })
+    assert.same({ "one" }, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+    r:set({ { { text = "two" } } })
+    assert.same({ "two" }, vim.api.nvim_buf_get_lines(buf, 0, -1, false))
+  end)
+
   it("redraws only the rows that changed", function()
     r:set({ { { text = "a" } }, { { text = "b" } }, { { text = "c" } } })
     local tick = vim.api.nvim_buf_get_changedtick(buf)

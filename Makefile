@@ -1,5 +1,5 @@
 # gitvim.nvim developer tasks
-.PHONY: all test test-file lint fmt fmt-check docs clean
+.PHONY: all test test-file lint fmt fmt-check docs bench clean
 
 # NB: not `NVIM` -- Neovim sets $NVIM to its server socket inside :terminal,
 # which would silently override this and try to exec the socket.
@@ -27,22 +27,27 @@ test-file:
 lint:
 	@command -v luacheck >/dev/null 2>&1 \
 		|| { echo "SKIPPED lint: luacheck not found (luarocks install luacheck)"; exit 0; }; \
-	luacheck lua tests plugin
+	luacheck lua tests plugin scripts
 
 fmt:
 	@command -v stylua >/dev/null 2>&1 \
 		|| { echo "SKIPPED fmt: stylua not found (cargo install stylua)"; exit 0; }; \
-	stylua lua tests plugin
+	stylua lua tests plugin scripts
 
 fmt-check:
 	@command -v stylua >/dev/null 2>&1 \
 		|| { echo "SKIPPED fmt-check: stylua not found (cargo install stylua)"; exit 0; }; \
-	stylua --check lua tests plugin
+	stylua --check lua tests plugin scripts
 
 # Regenerate helptags from doc/gitvim.txt
 docs:
 	@$(NVIM_BIN) --headless -c "helptags doc" -c "qa!"
 	@echo "doc/tags regenerated"
+
+# Performance gates (Plan.md §6) on a generated 10k-commit repository, built
+# once under $TMPDIR (or $BENCH_REPO). Exits non-zero when a gate fails.
+bench:
+	@$(NVIM_BIN) --headless --noplugin -u $(MINIMAL) -c "luafile scripts/bench.lua"
 
 clean:
 	@rm -rf .tests doc/tags

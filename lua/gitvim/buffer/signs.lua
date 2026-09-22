@@ -211,6 +211,10 @@ local function mapped_keys(buf)
   return taken, ours
 end
 
+--- Suffixes (after `keymaps.prefix`) that `map_buffer` claims, in order.
+--- :checkhealth reads this to report the ones another mapping shadows.
+M.keys = { "hs", "hu", "hr", "hp", "hb", "tb", "hB", "s", "u", "x", "S", "c", "C", "f", "p", "P" }
+
 ---@param buf integer
 function M.map_buffer(buf)
   if not config.options.keymaps.enabled or not mappable(buf) then

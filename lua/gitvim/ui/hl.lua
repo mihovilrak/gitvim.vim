@@ -87,6 +87,8 @@ local LINKS = {
   GitVimToggleOn = "Search",
   GitVimToggleOff = "Comment",
   GitVimMatch = "Search",
+  GitVimMatchRemoved = "Removed",
+  GitVimReplace = "Added",
 
   -- Graph.
   GitVimGraphNode = "Special",

@@ -429,6 +429,37 @@ local function under_hint(layout, text)
   return row
 end
 
+--- Commit rows from earlier renders, keyed by the commit (a reload makes new
+--- ones). A refresh redraws the whole sidebar, and rebuilding a page of
+--- commit rows each time is most of what the history costs it. Everything a
+--- row shows besides its commit is in `memo.sig`: the options, the width,
+--- the font signal, HEAD (its node is highlighted) and the minute (for
+--- relative dates); a change to any of them drops every row.
+local memo = { rows = setmetatable({}, { __mode = "k" }) }
+
+---@param ctx gitvim.ui.TabCtx
+---@param commit gitvim.log.Commit
+---@param layout gitvim.lane.Row
+---@return gitvim.render.Row
+local function cached_commit_row(ctx, commit, layout)
+  local row = memo.rows[commit]
+  if not row then
+    row = commit_row(ctx, commit, layout)
+    memo.rows[commit] = row
+  end
+  return row
+end
+
+---@param ctx gitvim.ui.TabCtx
+local function check_memo(ctx)
+  local head = ctx.store.status and ctx.store.status.branch.oid or ""
+  local minute = math.floor(os.time() / 60)
+  local sig = table.concat({ ctx.width, tostring(vim.g.have_nerd_font), head, minute }, "\0")
+  if memo.options ~= config.options or memo.sig ~= sig then
+    memo = { options = config.options, sig = sig, rows = setmetatable({}, { __mode = "k" }) }
+  end
+end
+
 ---@param ctx gitvim.ui.TabCtx
 ---@return gitvim.render.Row[]
 function M.rows(ctx)
@@ -452,10 +483,11 @@ function M.rows(ctx)
     return { tabs.hint("No commits yet.", 2) }
   end
 
+  check_memo(ctx)
   local rows = {}
   for i, commit in ipairs(graph.commits) do
     local layout = graph.rows[i]
-    rows[#rows + 1] = commit_row(ctx, commit, layout)
+    rows[#rows + 1] = cached_commit_row(ctx, commit, layout)
     local files = graph.open[commit.sha]
     if files == false then
       rows[#rows + 1] = under_hint(layout, "Loading files…")

@@ -228,9 +228,22 @@ end
 ---@param on_exit fun(err?: gitvim.git.Error)
 ---@return gitvim.git.Stream
 function M.stream(args, opts, on_stdout, on_exit)
+  return M.stream_exec(command(args), opts, on_stdout, on_exit, args)
+end
+
+--- `stream()` for a program other than git, which search needs: ripgrep is
+--- faster than `git grep` and understands the same globs VS Code does. Same
+--- contract; `cmd` is the whole argv, program first.
+---@param cmd string[]
+---@param opts? { cwd?: string }
+---@param on_stdout fun(chunk: string)
+---@param on_exit fun(err?: gitvim.git.Error)
+---@param args? string[]  what errors report as `args` (default `cmd`)
+---@return gitvim.git.Stream
+function M.stream_exec(cmd, opts, on_stdout, on_exit, args)
   opts = opts or {}
+  args = args or cmd
   local uv = vim.uv
-  local cmd = command(args)
   local stdout, stderr = uv.new_pipe(false), uv.new_pipe(false)
   local errs = {}
   local killed, exited, reading = false, false, false

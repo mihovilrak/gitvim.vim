@@ -151,6 +151,29 @@ describe("buffer.signs", function()
     vim.api.nvim_buf_delete(buf, { force = true })
   end)
 
+  it("lists exactly the keys it maps in signs.keys", function()
+    local buf = vim.api.nvim_create_buf(true, false)
+    signs.map_buffer(buf)
+    local mapped = {}
+    for _, m in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
+      if vim.startswith(m.desc or "", "gitvim: ") then
+        mapped[#mapped + 1] = m.lhs
+      end
+    end
+    local expected = {}
+    for _, suffix in ipairs(signs.keys) do
+      expected[#expected + 1] =
+        vim.api.nvim_replace_termcodes("<leader>g" .. suffix, true, true, true)
+    end
+    for i, lhs in ipairs(mapped) do
+      mapped[i] = vim.api.nvim_replace_termcodes(lhs, true, true, true)
+    end
+    table.sort(mapped)
+    table.sort(expected)
+    assert.same(expected, mapped)
+    vim.api.nvim_buf_delete(buf, { force = true })
+  end)
+
   it("never shadows a global mapping, even one made after its own", function()
     local buf = vim.api.nvim_create_buf(true, false)
     vim.keymap.set("n", "<leader>gs", "<Cmd>let g:kept = 1<CR>")

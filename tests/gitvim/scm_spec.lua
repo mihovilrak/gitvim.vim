@@ -301,6 +301,28 @@ describe("SOURCE CONTROL section", function()
     assert.equals(tostring(#store:groups().changes), header[#header].text)
   end)
 
+  it("reuses an unchanged file's row across renders, with the latest entry", function()
+    local before = entry_row(scm.rows(ctx), "modified.lua", "changes")
+    local err, result = await(function(done)
+      require("gitvim.git.status").get(repo.root, nil, done)
+    end)
+    assert.is_nil(err)
+    store:set_status(result)
+    local after = entry_row(scm.rows(ctx), "modified.lua", "changes")
+    assert.equals(before, after)
+    for _, entry in ipairs(store:groups().changes) do
+      if entry.path == "modified.lua" then
+        assert.equals(entry, after.data)
+      end
+    end
+  end)
+
+  it("rebuilds rows when the width changes", function()
+    local before = entry_row(scm.rows(ctx), "modified.lua", "changes")
+    ctx.width = 60
+    assert.are_not.equal(before, entry_row(scm.rows(ctx), "modified.lua", "changes"))
+  end)
+
   describe("actions", function()
     local select
 
