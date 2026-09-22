@@ -27,6 +27,7 @@ local SNIFF = 8000
 ---@field noeol boolean    the last line has no terminator
 ---@field missing boolean  the path does not exist on this side
 ---@field binary boolean
+---@field error? string
 ---@field special? string  "symlink" / "directory" / "submodule": shown, never diffed
 
 --- One change, in `vim.diff` "indices" form. A zero count means an insertion
@@ -108,18 +109,32 @@ end
 function M.read(root, rev, path, cb)
   if rev == nil then
     local file = root .. "/" .. path
-    local stat = vim.uv.fs_lstat(file)
+    local stat, stat_err, stat_code = vim.uv.fs_lstat(file)
     if not stat then
-      vim.schedule_wrap(cb)(absent())
+      local side = absent()
+      if stat_err and stat_code ~= "ENOENT" then
+        side.error = stat_err
+      end
+      vim.schedule_wrap(cb)(side)
     elseif stat.type == "link" then
       vim.schedule_wrap(cb)(absent("symlink"))
     elseif stat.type == "directory" then
       vim.schedule_wrap(cb)(absent("directory"))
     else
-      local fd = io.open(file, "rb")
-      local text = fd and fd:read("*a") or ""
-      if fd then
-        fd:close()
+      local fd, open_err = io.open(file, "rb")
+      if not fd then
+        local side = absent()
+        side.error = open_err or ("could not read " .. file)
+        vim.schedule_wrap(cb)(side)
+        return
+      end
+      local text, read_err = fd:read("*a")
+      fd:close()
+      if not text then
+        local side = absent()
+        side.error = read_err or ("could not read " .. file)
+        vim.schedule_wrap(cb)(side)
+        return
       end
       vim.schedule_wrap(cb)(M.parse(text))
     end

@@ -216,7 +216,9 @@ end
 ---@param side gitvim.hunk.Side
 ---@return string[]?
 local function placeholder(side)
-  if side.binary then
+  if side.error then
+    return { "Read error — review actions disabled", side.error }
+  elseif side.binary then
     return { "Binary file — not shown" }
   elseif side.special == "symlink" then
     return { "Symbolic link — not shown" }
@@ -304,6 +306,12 @@ local function load(v, cb)
     end
     v.left, v.right = left, right
     v.hunks = hunk_mod.compute(left, right, config.options.review.diffopt)
+    if left.error or right.error then
+      v.hunks = {}
+      v.actions = {}
+    else
+      v.actions = M.actions_for(v.left_rev, v.right_rev)
+    end
     render(v)
     if cb then
       cb()

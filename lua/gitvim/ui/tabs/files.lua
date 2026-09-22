@@ -17,6 +17,7 @@ local M = {
 --- Never shown, at any setting: the tree is for source, and `.git` is a
 --- 40,000-file distraction inside every repository.
 local ALWAYS_HIDDEN = { [".git"] = true }
+local scans = {}
 
 --- Where the tree is rooted.
 ---@param ctx gitvim.ui.TabCtx
@@ -41,12 +42,19 @@ end
 ---@param dir string
 ---@return { name: string, path: string, dir: boolean }[]
 local function scan(dir)
+  local show_hidden = config.options.files.show_hidden
+  local stat = vim.uv.fs_stat(dir)
+  local cached = scans[dir]
+  local mtime = stat and stat.mtime
+  if cached and cached.show_hidden == show_hidden and cached.mtime
+    and mtime and cached.mtime.sec == mtime.sec and cached.mtime.nsec == mtime.nsec then
+    return cached.entries
+  end
   local handle = vim.uv.fs_scandir(dir)
   if not handle then
     return {}
   end
 
-  local show_hidden = config.options.files.show_hidden
   local out = {}
   while true do
     local name, kind = vim.uv.fs_scandir_next(handle)
@@ -75,7 +83,23 @@ local function scan(dir)
     end
     return a.name < b.name
   end)
+  scans[dir] = { entries = out, show_hidden = show_hidden, mtime = mtime }
   return out
+end
+
+--- Explicit refresh hook; a nil path clears the whole tree cache.
+---@param path? string
+function M.invalidate(path)
+  if not path then
+    scans = {}
+    return
+  end
+  path = vim.fs.normalize(path)
+  for dir in pairs(scans) do
+    if dir == path or dir:sub(1, #path + 1) == path .. "/" then
+      scans[dir] = nil
+    end
+  end
 end
 
 --- Status kind per path, so a changed file is tinted the way it is in the
@@ -140,12 +164,15 @@ end
 ---@return gitvim.render.Row[]
 function M.rows(ctx)
   local root = root_of(ctx)
-  if not root or not ctx.store then
+  if not root then
     return tabs.no_repo()
   end
 
+  local tree_ctx = vim.tbl_extend("force", {}, ctx, {
+    store = ctx.store or require("gitvim.state").get(root),
+  })
   local rows = { tabs.title(vim.fs.basename(root):upper()) }
-  render_dir(ctx, root, 0, status_map(ctx), rows)
+  render_dir(tree_ctx, root, 0, status_map(tree_ctx), rows)
 
   if #rows == 1 then
     rows[#rows + 1] = tabs.hint("Empty.")

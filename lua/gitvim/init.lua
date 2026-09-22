@@ -7,7 +7,7 @@ local M = {}
 M.version = "0.1.0"
 
 local did_setup = false
-local detecting = false
+local discovery_request = 0
 
 --- Load status on the first open, and again on any open after the watcher
 --- saw a change while the sidebar was hidden. The sidebar draws its
@@ -15,22 +15,17 @@ local detecting = false
 --- finishes.
 ---@param path string
 local function discover(path)
-  if detecting then
-    return
-  end
-  local active = require("gitvim.git.repo").active()
-  if active then
-    if not require("gitvim.state").get(active.root):is_dirty("status") then
+  discovery_request = discovery_request + 1
+  local request = discovery_request
+  M.refresh(path, function(err)
+    if request ~= discovery_request then
       return
     end
-    path = active.root
-  end
-  detecting = true
-  M.refresh(path, function(err)
-    detecting = false
     if err and err.kind ~= "not_a_repo" then
       vim.notify(require("gitvim.git.cli").format_error(err), vim.log.levels.ERROR)
     end
+  end, function()
+    return request == discovery_request
   end)
 end
 
@@ -109,13 +104,16 @@ end
 --- Everything the UI does later is a subscriber to what this emits.
 ---@param path? string   defaults to the current buffer
 ---@param cb? fun(err?: gitvim.git.Error, store?: gitvim.Store)
-function M.refresh(path, cb)
+function M.refresh(path, cb, is_current)
   if type(path) == "function" then
     path, cb = nil, path
   end
   cb = cb or function() end
 
   require("gitvim.git.repo").detect(path, function(err, repo)
+    if is_current and not is_current() then
+      return
+    end
     if not repo then
       cb(err)
       return

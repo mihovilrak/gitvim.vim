@@ -121,7 +121,10 @@ end
 ---@return boolean? enabled
 function M.toggle_blame(value)
   local ok, enabled = call("toggle_current_line_blame", value)
-  return ok and enabled or nil
+  if not ok then
+    return nil
+  end
+  return enabled
 end
 
 ---@param direction "next"|"prev"

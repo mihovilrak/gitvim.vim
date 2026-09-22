@@ -119,6 +119,17 @@ end
 function M.detect(path, cb)
   local dir = start_dir(path)
 
+  -- A registered worktree also answers for newly visited descendants.
+  for root, known_repo in pairs(registry) do
+    if dir == root or dir:sub(1, #root + 1) == root .. "/" then
+      local repo = known_repo
+      lookup[dir] = repo.root
+      return vim.schedule(function()
+        cb(nil, repo)
+      end)
+    end
+  end
+
   local cached = lookup[dir]
   if cached ~= nil then
     if cached == false then
@@ -149,9 +160,6 @@ function M.detect(path, cb)
     { cwd = dir },
     function(err, res)
       if err then
-        if err.kind == "not_a_repo" then
-          lookup[dir] = false
-        end
         return cb(err, nil)
       end
 
@@ -161,7 +169,6 @@ function M.detect(path, cb)
 
       -- A bare repository has a gitdir but no worktree; gitvim is a worktree UI.
       if not root or root == "" then
-        lookup[dir] = false
         return cb({
           kind = "not_a_repo",
           message = "no work tree for " .. dir,
