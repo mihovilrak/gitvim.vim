@@ -1,0 +1,11 @@
+# test / dev artifacts
+.tests/
+doc/tags
+*.log
+.repro/
+tt.*
+debug/
+
+# editor
+.DS_Store
+*.swp
